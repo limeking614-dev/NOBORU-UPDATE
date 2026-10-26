@@ -1,0 +1,669 @@
+Threads = {}
+
+local IMAGE_CACHE_PATH = "ux0:data/noboru/temp/cache.image"
+
+local orderList = {}
+local currentTask = nil
+
+MAX_VRAM_MEMORY = 88 * 1024 * 1024
+local TRASH = {
+	Type = nil,
+	Garbadge = nil
+}
+
+local bytes = 0
+local uniques = {}
+
+local getAsyncResult = System.getAsyncResult
+local closeFile = System.closeFile
+local deleteFile = System.deleteFile
+local openFile = System.openFile
+local sizeFile = System.sizeFile
+local doesFileExist = System.doesFileExist
+local removeDirectory = RemoveDirectory
+local getImageFormat = System.getImageFormat
+
+local function img2bytes(width, height, dScale)
+	return bit32.band(width + 7, bit32.bnot(7)) * height * 4 / (dScale * dScale) + 1024
+end
+
+local is_net_inited = false
+
+-- what a normal phone browser sends (pages of the manga sites are requested with it)
+BROWSER_USERAGENT = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
+---Escapes `%` and spaces the way the network functions expect
+local function fixLink(l)
+	l = l:match("^(.-)%s*$") or ""
+	return (l:gsub("([^%%])%%([^%%])", "%1%%%%%2"):gsub(" ", "%%%%20"):gsub("([^%%])%%$", "%1%%%%"):gsub("^%%([^%%])", "%%%%%1"))
+end
+
+
+---Updates threads tasks
+function Threads.update()
+	if is_net_inited and not currentTask and #orderList == 0 then
+		Network.term()
+		is_net_inited = false
+	end
+	if not is_net_inited and (#orderList ~= 0 or currentTask) then
+		Network.init()
+		is_net_inited = true
+	end
+	if (#orderList == 0 and not currentTask) or System.getAsyncState() == 0 then
+		return
+	end
+	if not currentTask then
+		local new_order = {}
+		for i = 1, #orderList do
+			if orderList[i].Type == "Skip" then
+				Console.write("NET: Skip", Color.new(255, 255, 0))
+			else
+				new_order[#new_order + 1] = orderList[i]
+			end
+		end
+		orderList = new_order
+		if #orderList == 0 then
+			return
+		end
+		currentTask = table.remove(orderList, 1)
+		currentTask.Final = true
+		if currentTask.Type == "StringRequest" then
+			if currentTask.Link then
+				Network.requestStringAsync(currentTask.Link, currentTask.UA or USERAGENT, currentTask.HttpMethod, currentTask.PostData, currentTask.ContentType, currentTask.Cookie, currentTask.Header1, currentTask.Header2, currentTask.Header3, currentTask.Header4, currentTask.Proxy, currentTask.ProxyAuth)
+			else
+				Console.error("No Link given or internet connection problem")
+				uniques[currentTask.UniqueKey] = nil
+				currentTask = nil
+			end
+		elseif currentTask.Type == "FileDownload" or currentTask.Type == "ImageDownload" then
+			if doesFileExist(currentTask.Path) then
+				deleteFile(currentTask.Path)
+			end
+			if currentTask.Link then
+				if currentTask.Path then
+					Network.downloadFileAsync(currentTask.Link, currentTask.Path, currentTask.UA or USERAGENT, currentTask.HttpMethod, currentTask.PostData, currentTask.ContentType, currentTask.Cookie, currentTask.Header1, currentTask.Header2, currentTask.Header3, currentTask.Header4, currentTask.Proxy, currentTask.ProxyAuth)
+					if currentTask.Type == "ImageDownload" then
+						currentTask.Type = "Image"
+						currentTask.Final = false
+					end
+				else
+					Console.error("No Path given")
+					uniques[currentTask.UniqueKey] = nil
+					currentTask = nil
+				end
+			else
+				Console.error("No Link given or internet connection problem")
+				uniques[currentTask.UniqueKey] = nil
+				currentTask = nil
+			end
+		elseif currentTask.Type == "UnZip" then
+			if currentTask.DestPath then
+				removeDirectory(currentTask.DestPath)
+				if currentTask.Path then
+					System.extractZipAsync(currentTask.Path, currentTask.DestPath)
+				else
+					Console.error("No Path given")
+					uniques[currentTask.UniqueKey] = nil
+					currentTask = nil
+				end
+			else
+				Console.error("No DestPath given")
+				uniques[currentTask.UniqueKey] = nil
+				currentTask = nil
+			end
+		elseif currentTask.Type == "UnZipFile" then
+			if currentTask.Extract then
+				if currentTask.DestPath then
+					if currentTask.Path then
+						System.extractFromZipAsync(currentTask.Path, currentTask.Extract, currentTask.DestPath)
+					else
+						Console.error("No Path given")
+						uniques[currentTask.UniqueKey] = nil
+						currentTask = nil
+					end
+				else
+					Console.error("No DestPath given")
+					uniques[currentTask.UniqueKey] = nil
+					currentTask = nil
+				end
+			else
+				Console.error("No Extract file path given")
+				uniques[currentTask.UniqueKey] = nil
+				currentTask = nil
+			end
+		end
+		if currentTask then
+			Console.write(string.format("NET: #%s %s", 4 - currentTask.Retry, currentTask.Link or currentTask.Path or currentTask.UniqueKey), Color.new(0, 255, 0))
+		end
+	else
+		Console.write("(" .. currentTask.Type .. ")" .. (currentTask.Link or currentTask.Path or currentTask.UniqueKey), Color.new(0, 255, 0))
+		local saveFunction = function()
+			TRASH.Type = currentTask.Type
+			TRASH.Link = currentTask.Link
+			if currentTask.Type == "StringRequest" then
+				currentTask.Table[currentTask.Index] = getAsyncResult() or ""
+				if CFBridgeIsChallenge and not currentTask.Bridged and currentTask.OrigLink and CFBridgeIsChallenge(currentTask.Table[currentTask.Index]) then
+					local viaPc = CFBridgeRewrite(currentTask.OrigLink, currentTask.OrigMethod, currentTask.OrigPost, currentTask.OrigCT, true)
+					if viaPc then
+						CFBridgeLearn(currentTask.OrigLink)
+						currentTask.Link = fixLink(viaPc)
+						currentTask.Bridged = true
+						currentTask.Header1, currentTask.Header2, currentTask.Header3, currentTask.Header4 = "X-Vita-Reader: 1", "", "", ""
+						currentTask.HttpMethod, currentTask.PostData, currentTask.Cookie = GET_METHOD, "", ""
+						currentTask.Table[currentTask.Index] = ""
+						error("Cloudflare check - retrying through the PC")
+					end
+				end
+				-- ad / redirect page instead of the real page: follow the real link (max 4 hops, adbypass.lua)
+				if AdBypass and not currentTask.Bridged and type(currentTask.PlainLink) == "string" and currentTask.PlainLink:find("^https?://") then
+					local realLink = AdBypass.check(currentTask.Table[currentTask.Index], currentTask.PlainLink, currentTask.AdHops)
+					if realLink then
+						currentTask.AdHops = (currentTask.AdHops or 0) + 1
+						currentTask.PlainLink = realLink
+						currentTask.Link = fixLink(realLink)
+						currentTask.Table[currentTask.Index] = ""
+						currentTask.Retry = currentTask.Retry + 1 -- skipping an ad page is not a failed try
+						Console.write("NET: ad page skipped -> " .. realLink, Color.new(255, 255, 0))
+						error("Ad page skipped - requesting the real link")
+					end
+				end
+				local len = #currentTask.Table[currentTask.Index]
+				if len > 0 then
+					bytes = bytes + len
+					if len < 100 then
+						Console.write("NET:" .. currentTask.Table[currentTask.Index])
+					end
+				end
+			elseif currentTask.Type == "Image" then
+				if doesFileExist(currentTask.Path) then
+					local Width, Height = System.getPictureResolution(currentTask.Path)
+					if not Width or Width < 0 then
+						currentTask.Type = currentTask.Link and "ImageDownload" or currentTask.Type
+						if currentTask.Type == "ImageDownload" then
+							error("Redownloading file")
+						elseif currentTask.Type == "Image" then
+							Console.error("File you loading isn't picture")
+							uniques[currentTask.UniqueKey] = nil
+							currentTask = nil
+							return
+						end
+					end
+					Console.write(Width .. "x" .. Height .. " Image got")
+					-- The Vita GPU draws pictures in rows of 8 pixels: any other width shows slanted lines / a picture
+					-- stretched from the right. Download such a page again, resized to a multiple of 8.
+					if Width % 8 ~= 0 and currentTask.Link and currentTask.PlainLink and not currentTask.Aligned and not currentTask.Bridged and not currentTask.MaxWidth and not currentTask.MaxHeight and AlignedImageLink then
+						local fixed = AlignedImageLink(currentTask.PlainLink, Width)
+						if fixed then
+							currentTask.Aligned = true
+							currentTask.FallbackLink = currentTask.FallbackLink or currentTask.PlainLink
+							currentTask.FallbackH1, currentTask.FallbackH2, currentTask.FallbackH3, currentTask.FallbackH4 = currentTask.Header1, currentTask.Header2, currentTask.Header3, currentTask.Header4
+							currentTask.FallbackCookie, currentTask.FallbackUA = currentTask.Cookie, currentTask.UA
+							currentTask.Link = fixLink(fixed)
+							currentTask.Header1, currentTask.Header2, currentTask.Header3, currentTask.Header4 = "", "", "", ""
+							currentTask.Cookie, currentTask.UA = "", nil
+							if doesFileExist(currentTask.Path) then
+								deleteFile(currentTask.Path)
+							end
+							Network.downloadFileAsync(currentTask.Link, currentTask.Path, USERAGENT, GET_METHOD, "", XWWW, "", "", "", "", "", currentTask.Proxy, currentTask.ProxyAuth)
+							currentTask.Final = false
+							return
+						end
+					end
+					if img2bytes(Width, Height, 1) > Graphics.getFreeMemory() and Height <= 4096 and Height / Width <= 2 then
+						Console.error("No enough memory to load image")
+						uniques[currentTask.UniqueKey] = nil
+						currentTask = nil
+					else
+						if Height > 4096 and Height / Width > 2 and not currentTask.MaxHeight then
+							if img2bytes(Width, Height, 1) > Graphics.getFreeMemory() then
+								if img2bytes(Width, Height, 2) > Graphics.getFreeMemory() then
+									Console.error("No enough memory to load image")
+									uniques[currentTask.UniqueKey] = nil
+									currentTask = nil
+								else
+									currentTask.Image = {
+										Width = Width / 2,
+										Height = Height / 2,
+										RealWidth = Width,
+										RealHeight = Height,
+										Parts = math.ceil(Height / 8192)
+									}
+								end
+							else
+								currentTask.Image = {
+									Width = Width,
+									Height = Height,
+									RealWidth = Width,
+									RealHeight = Height,
+									Parts = math.ceil(Height / 4096)
+								}
+							end
+							Console.write(currentTask.Image.Parts)
+							currentTask.Type = "ImageLoadTable"
+						else
+							local scale = 1
+							if currentTask.MaxWidth and currentTask.MaxHeight then
+								if Width > Height then
+									scale = Width / currentTask.MaxWidth
+								else
+									scale = Height / currentTask.MaxHeight
+								end
+							elseif currentTask.MaxWidth then
+								scale = Width / currentTask.MaxWidth
+							elseif currentTask.MaxHeight then
+								scale = Height / currentTask.MaxHeight
+							end
+							if scale <= 1 then
+								scale = 1
+							elseif scale <= 2 then
+								scale = 2
+							elseif scale <= 4 then
+								scale = 4
+							elseif scale <= 8 then
+								scale = 8
+							elseif scale <= 16 then
+								scale = 16
+							elseif scale <= 32 then
+								scale = 32
+							else
+								scale = 64
+							end
+							if scale == 1 and currentTask.Animated and getImageFormat(currentTask.Path) == "gif" then
+								Graphics.loadGifAsync(currentTask.Path, scale)
+								currentTask.Type = "ImageLoad"
+								currentTask.Animated = true
+							else
+								Graphics.loadImageAsync(currentTask.Path, scale)
+								currentTask.Type = "ImageLoad"
+								currentTask.Animated = false
+							end
+						end
+					end
+				else
+					currentTask.Type = currentTask.Link and "ImageDownload" or currentTask.Type
+					if currentTask.Type == "ImageDownload" then
+						error("(Image)File not found")
+					elseif currentTask.Type == "Image" then
+						Console.error("(Image)File not found")
+						uniques[currentTask.UniqueKey] = nil
+						currentTask = nil
+						return
+					end
+				end
+				return
+			elseif currentTask.Type == "ImageLoad" then
+				if doesFileExist(currentTask.Path) then
+					if currentTask.Animated then
+						local res = getAsyncResult()
+						if res ~= nil then
+							local gif = Graphics.returnGif(res)
+							if gif ~= nil then
+								currentTask.Table[currentTask.Index] = {}
+								for i = 1, #gif do
+									currentTask.Table[currentTask.Index][i] = {
+										Image = Image:new(gif[i].image, FILTER_LINEAR),
+										Delay = gif[i].delay
+									}
+								end
+								currentTask.Table[currentTask.Index].Height = Graphics.getImageHeight(gif[1].image)
+								currentTask.Table[currentTask.Index].Width = Graphics.getImageWidth(gif[1].image)
+							end
+						end
+					else
+						currentTask.Table[currentTask.Index] = Image:new(getAsyncResult(), FILTER_LINEAR)
+					end
+					currentTask.Final = true
+				else
+					Console.error("(ImageLoad)File not found")
+				end
+			elseif currentTask.Type == "ImageLoadTable" then
+				if not currentTask.Image.i then
+					currentTask.Image.i = 0
+					currentTask.Table[currentTask.Index] = {}
+					currentTask.Table[currentTask.Index].Parts = currentTask.Image.Parts
+					currentTask.Table[currentTask.Index].SliceHeight = math.floor(currentTask.Image.Height / currentTask.Image.Parts)
+					currentTask.Table[currentTask.Index].Height = currentTask.Image.Height
+					currentTask.Table[currentTask.Index].Width = currentTask.Image.Width
+					currentTask.Image.free = function(self)
+						for i = 1, #self do
+							if self[i] and self[i].free then
+								self[i]:free()
+							end
+						end
+					end
+				elseif currentTask.Image.i < currentTask.Image.Parts then
+					currentTask.Image.i = currentTask.Image.i + 1
+					if currentTask.Table[currentTask.Index] == TRASH.Garbadge then
+						TRASH.Garbadge = Image:new(getAsyncResult())
+						TRASH.Type = "ImageLoadTable2"
+						return
+					end
+					currentTask.Table[currentTask.Index][currentTask.Image.i] = Image:new(getAsyncResult(), FILTER_LINEAR)
+					if not currentTask.Table[currentTask.Index][currentTask.Image.i] then
+						error("error with part function")
+					else
+						Console.write(string.format("Got %s image", currentTask.Image.i))
+					end
+				else
+					currentTask.Final = true
+					uniques[currentTask.UniqueKey] = nil
+					currentTask = nil
+					return
+				end
+				local sliceHeight = math.floor(currentTask.Image.RealHeight / currentTask.Image.Parts)
+				local Height = sliceHeight
+				if currentTask.Image.i == currentTask.Image.Parts - 1 then
+					Height = currentTask.Image.RealHeight - (currentTask.Image.i) * Height
+				end
+				if currentTask.Image.i < currentTask.Image.Parts then
+					Console.write(string.format("Getting %s %sx%s Image", sliceHeight * currentTask.Image.i, currentTask.Image.RealWidth, Height))
+					Graphics.loadPartImageAsync(currentTask.Path, 0, sliceHeight * currentTask.Image.i, currentTask.Image.RealWidth, Height)
+				else
+					uniques[currentTask.UniqueKey] = nil
+					currentTask = nil
+				end
+				return
+			elseif currentTask.Type == "FileDownload" then
+				if doesFileExist(currentTask.Path) then
+					local handle = openFile(currentTask.Path, FREAD)
+					bytes = bytes + sizeFile(handle)
+					closeFile(handle)
+				end
+			elseif currentTask.Type == "Skip" then
+				Console.error("WOW HOW THAT HAPPENED?")
+			end
+			uniques[currentTask.UniqueKey] = nil
+			currentTask = nil
+		end
+		local tempTask = currentTask
+		local success, err = pcall(saveFunction)
+		if success then
+			if currentTask == nil then
+				if tempTask.OnComplete then
+					tempTask.OnComplete()
+					Console.write("OnComplete executing for " .. tempTask.Type .. " " .. (tempTask.Link or tempTask.Path or tempTask.UniqueKey))
+				end
+				if tempTask.Final then
+					if tempTask.OnFinalComplete then
+						tempTask.OnFinalComplete()
+					end
+				end
+			end
+		elseif currentTask ~= nil then
+			Console.error("NET: " .. err)
+			currentTask.Retry = currentTask.Retry - 1
+			if currentTask.FallbackLink then
+				currentTask.Link = fixLink(currentTask.FallbackLink)
+				currentTask.Header1, currentTask.Header2, currentTask.Header3, currentTask.Header4 = currentTask.FallbackH1, currentTask.FallbackH2, currentTask.FallbackH3, currentTask.FallbackH4
+				currentTask.Cookie = currentTask.FallbackCookie or currentTask.Cookie
+				currentTask.UA = currentTask.FallbackUA or currentTask.UA
+				currentTask.FallbackLink = nil
+			end
+			if currentTask.Retry > 0 and currentTask.Table ~= TRASH then
+				table.insert(orderList, currentTask)
+			else
+				uniques[currentTask.UniqueKey] = nil
+			end
+			currentTask = nil
+		end
+	end
+	if TRASH.Garbadge then
+		if TRASH.Type == "ImageLoad" then
+			Console.write("NET:(Freeing Image)", Color.new(255, 0, 255))
+			if TRASH.Garbadge and TRASH.Garbadge.free then
+				TRASH.Garbadge:free()
+			end
+		elseif TRASH.Type == "ImageLoadTable2" then
+			Console.write("NET:(Freeing Table Image)", Color.new(255, 0, 255))
+			if TRASH.Garbadge and TRASH.Garbadge.free then
+				TRASH.Garbadge:free()
+			end
+		end
+		TRASH.Garbadge = nil
+	end
+end
+
+---Delete all traces
+function Threads.clear()
+	orderList = {}
+	uniques = {}
+	if currentTask ~= nil then
+		currentTask.Table = TRASH
+		currentTask.Index = "Garbadge"
+		Network.stopCurrentDownload()
+	end
+end
+
+---Gives boolean that is any task is running
+function Threads.isDownloadRunning()
+	return System.getAsyncState() == 0 or #orderList ~= 0 or currentTask ~= nil
+end
+
+---You can use Network function in here if you sure that your function is safe
+function Threads.netActionUnSafe(foo)
+	if not is_net_inited then
+		Network.init()
+		local result = foo()
+		Network.term()
+		return result
+	else
+		return foo()
+	end
+end
+
+---Add Network function that uses curl in Task and execute it
+function Threads.netActionSafe(foo)
+	repeat
+	until System.getAsyncState() ~= 0
+	return Threads.netActionUnSafe(foo)
+end
+
+---Checks if given parameters is enough to execute task
+local function taskcheck(t)
+	local task = t
+	if task.Type == "FileDownload" then
+		if task.Link and task.Path then
+			return true
+		end
+	else
+		return true
+	end
+	return false
+end
+
+---@param uniqueKey any
+---@param t table of parameters
+---@param foo function
+---Adds task to order with given `t` parameters
+local function taskete(uniqueKey, t, foo)
+	if uniqueKey and uniques[uniqueKey] and taskcheck(t) or not uniqueKey then
+		return false
+	end
+	local newTask = {
+		Type = t.Type,
+		Link = t.Link,
+		Table = t.Table,
+		Index = t.Index,
+		DestPath = t.DestPath,
+		Header1 = t.Header1 or "",
+		Header2 = t.Header2 or "",
+		Header3 = t.Header3 or "",
+		Header4 = t.Header4 or "",
+		MaxHeight = t.MaxHeight,
+		MaxWidth = t.MaxWidth,
+		Animated = t.Animated,
+		OnComplete = t.OnComplete,
+		OnFinalComplete = t.OnFinalComplete,
+		Extract = t.Extract,
+		Path = t.Path and (t.Path:find("^...?0:") and t.Path or ("ux0:data/noboru/" .. t.Path)) or IMAGE_CACHE_PATH,
+		Retry = 3,
+		HttpMethod = t.HttpMethod or GET_METHOD,
+		PostData = t.PostData or "",
+		ContentType = t.ContentType or XWWW,
+		Cookie = t.Cookie or "",
+		UniqueKey = uniqueKey
+	}
+	if type(newTask.Link) == "table" then
+		local t = newTask.Link
+		newTask.Link = t.Link
+		newTask.Header1 = t.Header1 or newTask.Header1 or ""
+		newTask.Header2 = t.Header2 or newTask.Header2 or ""
+		newTask.Header3 = t.Header3 or newTask.Header3 or ""
+		newTask.Header4 = t.Header4 or newTask.Header4 or ""
+		newTask.HttpMethod = t.HttpMethod or newTask.HttpMethod or GET_METHOD
+		newTask.PostData = t.PostData or newTask.PostData or ""
+		newTask.ContentType = t.ContentType or newTask.ContentType or XWWW
+		newTask.Cookie = t.Cookie or newTask.Cookie or ""
+	end
+	if type(newTask.Link) == "string" then
+		newTask.PlainLink = newTask.Link
+	end
+	if type(newTask.Link) == "string" and CFBridgeRewrite and newTask.Type ~= "UnZip" and newTask.Type ~= "UnZipFile" then
+		newTask.OrigLink, newTask.OrigMethod, newTask.OrigPost, newTask.OrigCT = newTask.Link, newTask.HttpMethod, newTask.PostData, newTask.ContentType
+		local viaPc = CFBridgeRewrite(newTask.Link, newTask.HttpMethod, newTask.PostData, newTask.ContentType, false)
+		if viaPc then
+			newTask.Link = viaPc
+			newTask.Bridged = true
+			newTask.Header1, newTask.Header2, newTask.Header3, newTask.Header4 = "X-Vita-Reader: 1", "", "", ""
+			newTask.HttpMethod, newTask.PostData, newTask.Cookie = GET_METHOD, "", ""
+		end
+	end
+	if (newTask.Type == "Image" or newTask.Type == "ImageDownload" or newTask.Type == "FileDownload") and type(newTask.Link) == "string" and WebpProxyLink then
+		local beforeProxy = newTask.Link
+		local isPic = newTask.Type == "Image" or newTask.Type == "ImageDownload" or (type(newTask.Path) == "string" and newTask.Path:find("%.image$") ~= nil)
+		newTask.Link = WebpProxyLink(newTask.Link, nil, isPic, newTask.MaxHeight ~= nil)
+		if type(newTask.Link) == "table" then
+			newTask.Link = newTask.Link.Link
+		end
+		-- if the converter service fails, the download falls back to the original image
+		if newTask.Link ~= beforeProxy then
+			newTask.FallbackLink = beforeProxy
+			newTask.FallbackH1, newTask.FallbackH2, newTask.FallbackH3, newTask.FallbackH4 = newTask.Header1, newTask.Header2, newTask.Header3, newTask.Header4
+		end
+	end
+	-- page requests look like a normal browser (Chrome user agent, Accept / Language / Referer headers)
+	if newTask.Type == "StringRequest" and Settings.BrowserMode ~= false and type(newTask.Link) == "string" and newTask.Link:find("^https://") and not newTask.Bridged and not newTask.Link:find("wsrv%.nl", 1) and newTask.Header1 == "" and newTask.Header2 == "" and newTask.Header3 == "" and newTask.Header4 == "" then
+		local origin = newTask.Link:match("^(https://[^/]+)")
+		if origin then
+			newTask.Header1 = "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7"
+			newTask.Header2 = "Accept-Language: en-US,en;q=0.9"
+			newTask.Header3 = "Referer: " .. origin .. "/"
+			newTask.UA = newTask.UA or BROWSER_USERAGENT
+		end
+	end
+	-- sites whose Cloudflare check was passed in the Vita browser: send that browser's cookie + user agent
+	if type(newTask.Link) == "string" and CFCookieFor and not newTask.Bridged and newTask.Type ~= "UnZip" and newTask.Type ~= "UnZipFile" then
+		local ck, ua = CFCookieFor(newTask.FallbackLink or newTask.Link)
+		if ck then
+			if newTask.FallbackLink then
+				-- the first try goes to the image service, which must never get the cookie
+				newTask.FallbackCookie, newTask.FallbackUA = ck, ua
+			else
+				newTask.Cookie = (newTask.Cookie ~= "" and (newTask.Cookie .. "; ") or "") .. ck
+				newTask.UA = ua
+			end
+		end
+	end
+	if type(newTask.Link) == "string" then
+		newTask.Link = fixLink(newTask.Link)
+	end
+	newTask.Proxy = Settings.UseProxy and (Settings.ProxyIP .. ":" .. Settings.ProxyPort) or ""
+	newTask.ProxyAuth = Settings.UseProxyAuth and Settings.ProxyAuth or ""
+	foo(newTask)
+	uniques[uniqueKey] = newTask
+	return true
+end
+
+local function taskinsert(task)
+	table.insert(orderList, 1, task)
+end
+
+---@param uniqueKey string
+---@param t table
+---@return boolean
+---Inserts task to threads
+function Threads.insertTask(uniqueKey, t)
+	return taskete(uniqueKey, t, taskinsert)
+end
+
+local function task_add(task)
+	orderList[#orderList + 1] = task
+end
+
+---@param uniqueKey string
+---@param t table
+---@return boolean
+---Adds task to threads
+function Threads.addTask(uniqueKey, t)
+	return taskete(uniqueKey, t, task_add)
+end
+
+---Terminates Threads functions and net features
+function Threads.terminate()
+	if is_net_inited then
+		Threads.clear()
+		while currentTask do
+			Threads.update()
+		end
+		Network.term()
+		is_net_inited = false
+	end
+end
+
+function Threads.getProgress(uniqueKey)
+	local task = uniques[uniqueKey]
+	if task then
+		if currentTask == task then
+			if task.Type == "ImageDownload" or task.Type == "StringRequest" or task.Type == "FileDownload" or (task.Type == "Image" and task.Link) then
+				return math.max(math.min(1, Network.getDownloadedBytes() / Network.getTotalBytes()), 0)
+			else
+				return 1
+			end
+		else
+			return 0
+		end
+	end
+	return 0
+end
+
+---@param uniqueKey string
+---Removes task by `UniqueKey`
+function Threads.remove(uniqueKey)
+	if uniques[uniqueKey] then
+		if currentTask == uniques[uniqueKey] then
+			currentTask.Table, currentTask.Index = TRASH, "Garbadge"
+			Network.stopCurrentDownload()
+		else
+			uniques[uniqueKey].Type = "Skip"
+		end
+		uniques[uniqueKey] = nil
+	end
+end
+
+---@param uniqueKey string
+---Checks if task is in order by `UniqueKey`
+function Threads.check(uniqueKey)
+	return uniques[uniqueKey] ~= nil
+end
+
+---@return number
+---Returns count of bytes downloaded by Threads functions
+function Threads.getMemoryDownloaded()
+	return bytes
+end
+
+---@return integer number of tasks
+---Returns quantity of tasks in order
+function Threads.getTasksNum()
+	return #orderList + (currentTask and 1 or 0)
+end
+
+function Threads.getNonSkipTasksNum()
+	local c = 0
+	for i = 1, #orderList do
+		if orderList[i].Type ~= "Skip" then
+			c = c + 1
+		end
+	end
+	return c + (currentTask and currentTask.Type ~= "Skip" and 1 or 0)
+end
