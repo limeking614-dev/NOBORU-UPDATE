@@ -1,154 +1,223 @@
-<!--img src="/res/logo.png" width="50%" height="50%"><br-->
-# Noboru
-Application for PlayStation Vita to read manga or comics<br>
-![GitHub All Releases](https://img.shields.io/github/downloads/Creckeryop/NOBORU/total?style=flat-square)
-![GitHub](https://img.shields.io/github/license/Creckeryop/NOBORU?style=flat-square)
-![GitHub top language](https://img.shields.io/github/languages/top/Creckeryop/NOBORU?style=flat-square)
-[![VitaDB](https://img.shields.io/badge/Vita-DB-blue?style=flat-square)](https://vitadb.rinnegatamante.it/#/info/534)
-<br>
-![Screenshots](/res/screenshots.gif)
+# Noboru – PS Vita Manga Reader
+
+Noboru is a manga and comic reader for the PlayStation Vita and PS TV.
+
+This repository contains an updated version of the original Noboru project, with additional reader features, website compatibility improvements, and network options.
+
+> **Disclaimer:** I am not the original creator of Noboru. This project is an update based on the original open-source application by [Creckeryop](https://github.com/Creckeryop/NOBORU). Please see the credits below for the original project and other contributors.
+
 ## Features
-* Browsing dozens of different manga / comics sites
-* Build-in self-updater, so you don't need to download new version at VitaDB or GitHub
-* Manga / Comics reader
-* Manga / Comics downloading
-* Vertical orientation in Reader
-* Full-Touch support (MultiTouch, Swipes, Double-Tap, etc.)
-* Manga / Comics tracking
-* Support of longpages without downscaling (downscales only if no enough vram)
-* Support of formats such as: .ZIP .CBZ
-* Multi-language (English, Russian, Spanish, Vietnamese, Italian, French, Turkish, Portuguese (Brazil), Traditional and Simplified Chinese, Romanian, Polish, German, Japanese)
-* Offline mode (if you forgot to track manga / comics you downloaded, check history tab, and don't clear cache)
-* Advanced search (Filters, Tags, etc.)
-* Custom settings for manga / comics (Orientation, Read Direction, Zoom mode)
-* A large number of settings that will help you customize the application for yourself
 
-All issues related to catalogs should be in <a href="https://github.com/Creckeryop/NOBORU-parsers">this repo</a>
+- Browse supported manga and comic websites.
+- Read manga online or offline.
+- Download chapters for offline reading.
+- Vertical reading orientation and touch controls.
+- Continuous vertical scrolling for webtoon-style chapters.
+- Manga tracking and reading history.
+- Import local manga and comic files.
+- Custom reading settings, including zoom and reading direction.
+- Reader clock with time and date options.
+- Optional menu sound effects.
+- Improved image loading and website compatibility.
+- Optional PC bridge for websites the PS Vita cannot access directly.
 
-## What's new in this version
-This version adds site loading, reader and network features on top of NOBORU (all in Lua, in `source/assets/libs` and `source/assets/parsers`). Full list in [CHANGELOG.md](CHANGELOG.md).
-* **All pictures as JPEG** - every manga page and every chapter cover is loaded as a small JPEG (covers smaller than pages) for faster loading. Setting: Network > "All pages + covers to JPEG"
-* **Online site profiles** - when a site is checked, the app fingerprints its engine (Madara, MangaThemesia, Next.js) so the source tries that engine's list / search layouts first, and reads the Aidoku community source list on GitHub (plus any list URLs you add) to fill in the site's proper name, language and rating. Setting: Network > "Online site profiles (Aidoku list)"
-* **Better generic site reader** - chapter pages are read from reader scripts (`"images":[...]`, Next.js data) when the page has no normal image tags, the site's own logo / menu pictures are never taken as pages, more lazy-loading attributes are understood, and Madara / MangaThemesia style list addresses are tried
-* **Reader clock** - show the time and/or the date (never the year) while reading, in the top-left or top-right corner, 12 or 24 hour. Settings > Reader: "Clock in reader" (Off / Time / Date / Time + Date), "Clock position", "Clock 24 hour time"
-* **Webtoon reader** - continuous vertical scroll of the whole chapter (Reader mode setting), also in the rotated (Vertical) orientation
-* **Cloudflare via PC** - optional PC bridge (`vitaserver.py` / `CFBridge.exe`) for sites the Vita can't open on its own
-* **Menu sounds** - short button sounds, each switchable in Settings > Controls
+## What's new in this version?
+
+This version adds site-loading, reader, and network improvements on top of the original Noboru project. More details are available in [CHANGELOG.md](CHANGELOG.md).
+
+### JPEG image loading
+
+Manga pages and chapter covers can be converted to JPEG to help reduce image sizes and improve loading performance.
+
+Change this option under:
+
+`Settings → Network → All pages + covers to JPEG`
+
+### Improved website compatibility
+
+The generic site reader has been improved to support more website layouts and ways of loading chapter images. This includes support for reader scripts and Next.js data, additional lazy-loading attributes, and layouts used by Madara and MangaThemesia sites.
+
 ### Online site profiles
-Aidoku sources are compiled WebAssembly, which the Vita can't run, so only the published source-list *data* is used (`https://aidoku-community.github.io/sources/index.min.json`). Put more list URLs (one per line, `https://...`) in `ux0:data/noboru/profile_sources.txt`. A site is looked up once and remembered in `ux0:data/noboru/siteprofiles.lua`; Cross on the failed check screen asks again.
 
-### Not included
-Paywalled, locked or login-only chapters are not unlocked. A site that blocks the Vita's network code (TLS) or Cloudflare checks the app can't pass still needs the PC bridge or VitaSurf.
-## Table of Contents
-- [Requirements](#requirements)
-- [Data structure](#data-structure)
-- [Importing](#importing)
-- [Backup](#backup)
-- [Known issues](#known-issues)
-- [FAQ](#faq)
-- [Building](#building)
-- [ToDo List](#todo)
-- [Credits](#credits)
+Noboru can identify supported website engines and use online source-list information to help recognize a site's name, language, and other details.
+
+**Important:** Aidoku's executable extensions cannot run in Noboru. This feature uses the published source-list data only.
+
+Additional source-list URLs can be added, one per line, in:
+
+`ux0:data/noboru/profile_sources.txt`
+
+### Reader clock
+
+Display the time, date, or both while reading manga.
+
+Available settings:
+- Off
+- Time
+- Date
+- Time + Date
+- 12-hour or 24-hour time
+- Top-left or top-right position
+
+Find these options under:
+
+`Settings → Reader`
+
+### Webtoon reader
+
+Read a complete chapter using continuous vertical scrolling instead of moving between individual pages. This mode is also available when using vertical orientation.
+
+### Optional PC Cloudflare bridge
+
+Some websites use Cloudflare or other protections that the PS Vita cannot handle by itself. Noboru includes an optional PC bridge using `vitaserver.py` or `CFBridge.exe` to handle supported requests through a computer.
+
+**Note:** The bridge does not guarantee that every website will work. Some sites may still require VitaSurf or may remain incompatible.
+
+### Menu sounds
+
+Short interface sounds provide feedback when navigating menus. They can be switched on or off under:
+
+`Settings → Controls`
+
+## Installation
+
+1. Open the [Noboru Update GitHub repository](https://github.com/limeking614-dev/NOBORU-UPDATE).
+2. Download an available VPK from the [Releases page](https://github.com/limeking614-dev/NOBORU-UPDATE/releases).
+3. Transfer the VPK to your PS Vita or PS TV.
+4. Open VitaShell and locate the VPK.
+5. Press **X** to install it.
+6. Launch Noboru from the LiveArea.
+
+## Importing manga for offline reading
+
+You can import your own manga and comics into Noboru in these ways:
+
+- Import a folder containing images.
+- Import a folder containing multiple folders of images.
+- Import a `.CBZ` or `.ZIP` archive.
+- Import an individual `.CBZ` or `.ZIP` file.
+
+Supported image formats inside archives:
+- JPG
+- JPEG
+- PNG
+- BMP
+- GIF
+
+**Not currently supported:** WebP images and CBR/RAR archives.
+
+Folders being imported should contain image files only.
+
 ## Requirements
-* 50 - 60 MB memory for online reading
-* More than 100 MB memory for offline reading (please make sure you have enough memory)
-## Data structure
-|Path|Description|
-|---|---|
-|```ux0:data/noboru/cache/```| folder containing cached manga info (also history) |
-|```(ux0/uma0):data/noboru/chapters/```| folder containing saved chapters |
-|```(ux0/uma0):data/noboru/import/```| folder where you can store files you want to read locally or import to Library (0.35+) |
-|```ux0:data/noboru/parsers/```| folder for catalogs |
-|```ux0:data/noboru/cusettings/```| folder for manga's custom settings |
-|```ux0:data/noboru/save.dat```| library savefile |
-|```ux0:data/noboru/c.c```| saved chapters info |
-|```ux0:data/noboru/settings.ini```| application settings |
-|```ux0:data/noboru/siteprofiles.lua```| what the app learned about each added site (engine, name, language) |
-|```ux0:data/noboru/profile_sources.txt```| optional: extra online source-list URLs for site profiles, one per line |
-|```ux0:data/noboru/cfbridge.lua```| sites sent through the PC Cloudflare bridge |
-|```ux0:data/noboru/vitaserver.lua```| address of the PC server |
 
-You can just delete `noboru` folder to reset all settings
-## Importing
-So if you want to add your manga to library, you have four ways:
-* You can import folder with images
-* You can import folder with folders with images
-* You can import folder with (.cbz, .zip) files
-* You can import one (.cbz, .zip) file
+The original README lists these approximate memory requirements:
 
-Also if you want to read .cbz file directly you can just open file in import section<br><br>
-<b>Requirements to .cbz or .zip file:</b>
-* Names of images should end with .jpg .jpeg .png .bmp or .gif (webp not supported yet)
+- 50–60 MB for online reading.
+- More than 100 MB for offline reading.
 
-<b>Requirements to folders:</b>
-* No extra (non-image) files
+Actual memory use may vary depending on the manga, chapter, and device.
 
-CBR not supported (I'm working to find the way to support RAR archives, some images brakes and I just can't add that on this moment)
+## Data and storage
+
+Noboru stores its application data in:
+
+`ux0:data/noboru/`
+
+This folder contains cached manga information, downloaded chapters, imported files, catalog parsers, custom manga settings, and application settings.
+
+Deleting the `noboru` folder resets the application's stored data and settings. Back up anything important before deleting it.
+
 ## Backup
-If you want to backup, here's what you can backup
-|Files|What saves|
-|---|---|
-|```save.dat```|Library list|
-|```settings.ini```|Settings|
-|```history.dat + info.txt```|History list|
-|```info.txt + cache folders (as many you want)```|Bookmarks + Covers|
-|```c.c + chapters folders (as many you want)```|Chapters|
-|```cusettings/*.ini```|Custom settings for manga|
 
-*Be careful, if you want to save chapters and don't search this chapter on internet you should backup History list*
-## Known issues
-<b>Issue</b> After importing archive file, manga / comic shows "Unknown error (Parser's)"<br>
-<b>Advice</b> Make sure that archive file you have imported is supported.<br>
-## FAQ
-- **I've found a bug that ...**
-    - You can create issue [here](https://github.com/Creckeryop/NOBORU/issues), give a screenshot with error or error file
-- **Catalog is empty / All manga has no chapters / All chapters has no images**
-    - First of all check if your catalog version isn't outdated. To make sure if it's last version refresh all catalogs sometimes. If new version of catalog was installed, app will notify you with 'Updated' message on catalog. If that doesn't work, you can write on my email: didager@yandex.ru (please tell me every detail you can, what's catalog, what's manga, what's chapter, what's page). Also you can create issue [here](https://github.com/Creckeryop/NOBORU-parsers/issues)
-- **How to open debug console?**
-    - DPAD_LEFT + START
-- **How to download chapters in background?**
-    - There is only one way to download in background, don't press *power* button! Screen will shut by itself
-- **Image is loading at the same speed as when downloading from network, is it broken?**
-    - It is not broken, if you download chapters at the same time with reading. Image loading and downloading working in the one-thread mode. And your page that you are reading putted in queue, but if first task in queue is active, app can't cancel it not to corrupt data. That's why it is happening. If i will find a way to make it faster, i will make it faster.
-- **Reader doesn't load some images**
-    - Please create Issue and describe how you have come to this (Parser you used, Manga, Chapter and page). This app supports only JPEG, BMP and PNG formats. Make sure that image that you load isn't a gif or else. You can check network address through debug console.
-- **I downloaded app and can't see any catalogs**
-    - Go to Catalog tab -> Press Triangle. This will update catalogs list.
-- **How to setup proxy?**
-    - You can write ip address like '192.169.0.1' or you can specify your proxy kind like 'socks5h://192.168.0.1' or "http", "https", "socks4a", "socks5", "socks5h"
-- **Application is lagging sometimes, when new manga is appearing**
-    - That's a print function problem, all new characters that appear should be cached. In the first launch, app can't load all glyphs because it's a longtime process, so app loads only Latin and Cryllic symbols.
-- **A site shows "Couldn't read the site"**
-    - The text under the title says why (cannot reach, Cloudflare, only an ad page, empty page, no manga list found). Cross checks again, Triangle opens the site in VitaSurf (or the Vita browser when VitaSurf isn't installed), Circle opens the source anyway
-- **A chapter shows one picture (1/1)**
-    - Usually the site's logo / a loading image was taken as the chapter. This version reads the pages from the site's reader script instead; if a site still does it, open an issue with the site and chapter
-- **How do I show the time while reading?**
-    - Settings > Reader > "Clock in reader" (Off / Time / Date / Time + Date), then "Clock position" (top left / top right) and "Clock 24 hour time"
-- **How do I turn off the site check / online lookups / JPEG conversion?**
-    - Settings > Network: "Check site when opened", "Online site profiles (Aidoku list)", "All pages + covers to JPEG",
-## Building
-Execute `build.bat` to create working .vpk
-## TODO
-* More languages
+The original project stores different information in separate files and folders. Important items to back up include:
+
+| File or folder | What it contains |
+|---|---|
+| `save.dat` | Library list |
+| `settings.ini` | Application settings |
+| `history.dat` and `info.txt` | History information |
+| `info.txt` and cache folders | Bookmarks and covers |
+| `c.c` and chapter folders | Saved chapter information and chapters |
+| `cusettings/*.ini` | Custom manga settings |
+
+If you want to keep downloaded chapters that you may not be able to find online again, back up the history information as well as the chapter files.
+
+## Troubleshooting and FAQ
+
+### The catalog is empty
+
+Open the Catalog tab and press **Triangle** to refresh the catalog list.
+
+### A website shows "Couldn't read the site"
+
+The message below the title should explain the reason, such as a connection problem, Cloudflare protection, an empty page, or an unsupported layout.
+
+- Press **Cross** to check the site again.
+- Press **Triangle** to open the site in VitaSurf, or the Vita browser if VitaSurf is not installed.
+- Press **Circle** to open the source anyway.
+
+Some websites may still be incompatible.
+
+### A chapter only displays one image
+
+The website may have caused its logo or a loading image to be detected as the chapter page. If this continues, report the website and chapter so the issue can be investigated.
+
+### Some images do not load
+
+Check that the image format is supported. If the problem continues, include the website, manga title, chapter, and page when reporting the issue.
+
+### How do I show the clock while reading?
+
+Go to `Settings → Reader` and change **Clock in reader** to Time, Date, or Time + Date. You can also change the clock position and 24-hour option.
+
+### How do I turn off site checks, online profiles, or JPEG conversion?
+
+Open `Settings → Network` and adjust the relevant options:
+- Check site when opened
+- Online site profiles (Aidoku list)
+- All pages + covers to JPEG
+
+### How do I open the debug console?
+
+Press **DPAD_LEFT + START**.
+
+### How do I configure a proxy?
+
+The original application supports proxy addresses and proxy types such as HTTP, HTTPS, SOCKS4a, SOCKS5, and SOCKS5h. Enter the appropriate address and type in the network settings.
+
+## Known limitations
+
+- Not every manga website is supported.
+- Some websites require the optional PC bridge or VitaSurf.
+- Paywalled, locked, or login-only chapters are not unlocked.
+- Aidoku executable extensions cannot run in Noboru; only source-list data is used for site profiles.
+- WebP images and CBR/RAR archives are not supported for local imports.
+
+## Building from source
+
+To build the application:
+
+1. Download or clone this repository.
+2. Set up the required PS Vita development environment.
+3. Run `build.bat`.
+4. The build process should create the VPK.
+
 ## Credits
-Claude AI (assistant) - modifications and new features in this version
-<br>[Creckeryop](https://github.com/Creckeryop/NOBORU) - original NOBORU (this project is a fork of it)
-<br>VitaSurf / [NetSurf](https://www.netsurf-browser.org/) - the browser used by the Cloudflare bridge
-<br>[Aidoku community sources](https://github.com/Aidoku-Community/sources) - source list data used for site profiles
-<br>[wsrv.nl](https://wsrv.nl/) - image conversion service used for the JPEG option
-<br>
-[Rinnegatamante](https://github.com/Rinnegatamante) - [LuaPlayerPlus_Vita](https://github.com/Rinnegatamante/lpp-vita)
-<br>[VitaSDK](https://github.com/vitasdk) - vitaSDK
-<br>[xerpi](https://github.com/xerpi) - [libvita2d](https://github.com/xerpi/libvita2d)
-<br>[theFloW](https://github.com/theOfficialFlow) - [VitaShell](https://github.com/TheOfficialFloW/VitaShell) for some functions
-<br>[SamuEDL](https://github.com/SamuEDL) - Spanish translation
-<br>[nguyenmao2101](https://github.com/nguyenmao2101) - Vietnamese translation
-<br>[theheroGAC](https://github.com/theheroGAC) - Italian translation
-<br>[Cimmerian-Iter](https://github.com/Cimmerian-Iter) - French translation
-<br>[Kemal Sanlı](https://github.com/kemalsanli) - Turkish translation
-<br>[rutantan](https://github.com/rutantan) - Portuguese (Brazil) translation
-<br>[Qingyu510](https://github.com/Qingyu510) - Simplified Chinese & Traditional Chinese translation
-<br>[tmihai20](https://github.com/tmihai20) - Romanian translation
-<br>[tof4](https://github.com/tof4) - Polish translation
-<br>[lukrynka](https://github.com/lukrynka) - German translation
-<br>[kuragehime](https://github.com/kuragehimekurara1) - Japanese translation
+
+- **Creckeryop** – Original Noboru project: [NOBORU](https://github.com/Creckeryop/NOBORU).
+- **VitaSurf / NetSurf** – Browser used by the Cloudflare bridge.
+- **Aidoku Community** – Public source-list data used for site profiles.
+- **wsrv.nl** – Image conversion service used by the JPEG option.
+- **Rinnegatamante** – [LuaPlayerPlus Vita](https://github.com/Rinnegatamante/lpp-vita).
+- **VitaSDK** – PlayStation Vita development tools.
+- **xerpi** – [libvita2d](https://github.com/xerpi/libvita2d).
+- **theFloW** – [VitaShell](https://github.com/TheOfficialFlow/VitaShell) and related contributions.
+- **Translation contributors** – Thank you to everyone who contributed translations to the original project.
+
+This repository contains modifications and additional features built on top of the original Noboru project.
+
+## Links
+
+- [Noboru Update – GitHub](https://github.com/limeking614-dev/NOBORU-UPDATE)
+- [Original Noboru – GitHub](https://github.com/Creckeryop/NOBORU)
+- [Original Noboru Parser Repository](https://github.com/Creckeryop/NOBORU-parsers)
