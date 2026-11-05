@@ -27,27 +27,13 @@ All issues related to catalogs should be in <a href="https://github.com/Creckery
 
 ## What's new in this version
 This version adds site loading, reader and network features on top of NOBORU (all in Lua, in `source/assets/libs` and `source/assets/parsers`). Full list in [CHANGELOG.md](CHANGELOG.md).
-* **Checking site screen** - when a site (source) is opened, the app really reads it like a browser: the front page, then the source's own list of titles. Green check = titles were found and the source opens by itself. Red cross = the reason is shown (Cross: retry, Triangle: VitaSurf / browser, Circle: open anyway, Square: cancel)
-* **Ad / redirect page skipping** - when a site answers with an ad wall, "click to continue" page, meta-refresh or script redirect, the real link is found and followed (up to 4 hops) on every page request, so sources load straight away
-* **Browser-like requests** - page requests are sent with a normal phone-browser user agent and `Accept` / `Accept-Language` / `Referer` headers
 * **All pictures as JPEG** - every manga page and every chapter cover is loaded as a small JPEG (covers smaller than pages) for faster loading. Setting: Network > "All pages + covers to JPEG"
 * **Online site profiles** - when a site is checked, the app fingerprints its engine (Madara, MangaThemesia, Next.js) so the source tries that engine's list / search layouts first, and reads the Aidoku community source list on GitHub (plus any list URLs you add) to fill in the site's proper name, language and rating. Setting: Network > "Online site profiles (Aidoku list)"
-* **VitaSurf bridge for Cloudflare** - on a failed check, Triangle starts [VitaSurf](#vitasurf-bridge) on the site; the Cloudflare cookie it earns is then used by NOBORU for that site
 * **Better generic site reader** - chapter pages are read from reader scripts (`"images":[...]`, Next.js data) when the page has no normal image tags, the site's own logo / menu pictures are never taken as pages, more lazy-loading attributes are understood, and Madara / MangaThemesia style list addresses are tried
 * **Reader clock** - show the time and/or the date (never the year) while reading, in the top-left or top-right corner, 12 or 24 hour. Settings > Reader: "Clock in reader" (Off / Time / Date / Time + Date), "Clock position", "Clock 24 hour time"
 * **Webtoon reader** - continuous vertical scroll of the whole chapter (Reader mode setting), also in the rotated (Vertical) orientation
 * **Cloudflare via PC** - optional PC bridge (`vitaserver.py` / `CFBridge.exe`) for sites the Vita can't open on its own
 * **Menu sounds** - short button sounds, each switchable in Settings > Controls
-
-### VitaSurf bridge
-Needs VitaSurf (NetSurf for the Vita, title id `VSRF00001`) installed. Nothing in VitaSurf is changed except its user options file `ux0:data/VitaSurf/Choices` (`homepage_url`, `user_agent`), which is put back afterwards.
-1. A site check fails (for example a Cloudflare "Just a moment..." page) - press **Triangle**
-2. NOBORU sets the site as VitaSurf's start page and starts VitaSurf
-3. Let the page load / pass the check there, then quit VitaSurf (Select + Start)
-4. Open the source again in NOBORU: it reads `ux0:data/VitaSurf/Cookies`, finds the site's `cf_clearance` cookie and sends it (with the same user agent) on every request to that site
-
-Limits: Cloudflare ties its cookie to the browser identity that earned it, so the bridge only works if VitaSurf accepts the `user_agent` option; VitaSurf's JavaScript engine is small and may not pass the hardest checks (Turnstile); NOBORU can't start VitaSurf with an address argument, so the hand-over goes through the options file.
-
 ### Online site profiles
 Aidoku sources are compiled WebAssembly, which the Vita can't run, so only the published source-list *data* is used (`https://aidoku-community.github.io/sources/index.min.json`). Put more list URLs (one per line, `https://...`) in `ux0:data/noboru/profile_sources.txt`. A site is looked up once and remembered in `ux0:data/noboru/siteprofiles.lua`; Cross on the failed check screen asks again.
 
