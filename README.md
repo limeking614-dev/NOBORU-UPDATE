@@ -1,223 +1,221 @@
 # Noboru – PS Vita Manga Reader
 
-Noboru is a manga and comic reader for the PlayStation Vita and PS TV.
+**An updated version of NOBORU for PlayStation Vita and PS TV.**
 
-This repository contains an updated version of the original Noboru project, with additional reader features, website compatibility improvements, and network options.
+Noboru is a manga and comic reader for the PlayStation Vita. It allows you to browse manga sources, read manga online, download chapters, and manage your personal manga library.
 
-> **Disclaimer:** I am not the original creator of Noboru. This project is an update based on the original open-source application by [Creckeryop](https://github.com/Creckeryop/NOBORU). Please see the credits below for the original project and other contributors.
+This repository contains an updated version of the original NOBORU project, with additional features, improvements to website compatibility, image loading, reader functionality, and networking.
+
+> **Important:** I am not the original creator of NOBORU. This project is based on the original open-source application, with modifications and additional features.
+
+[Download](https://github.com/limeking614-dev/NOBORU-UPDATE/releases) | [Report a Bug](https://github.com/limeking614-dev/NOBORU-UPDATE/issues) | [Original NOBORU](https://github.com/Creckeryop/NOBORU)
+
+---
 
 ## Features
 
-- Browse supported manga and comic websites.
-- Read manga online or offline.
+Noboru provides several features designed to make reading manga on the PS Vita easier.
+
+### 📚 Manga Catalog
+
+- Browse manga and comic sources.
+- Search for manga from supported websites.
+- Browse available manga chapters.
+- Add custom manga websites where supported.
+- Refresh and manage your available catalogs.
+
+**Note:** Available sources depend on website compatibility and the installed catalog parsers. Currently, the catalog includes AsuraScans and MangaTown.
+
+### 📖 Manga Reader
+
+- Read manga and comics directly on your PS Vita.
+- Vertical reading orientation.
+- Webtoon-style continuous scrolling.
+- Full touchscreen support.
+- Swipe gestures and double-tap controls.
+- Custom reading direction and zoom settings.
+- Support for long manga pages.
 - Download chapters for offline reading.
-- Vertical reading orientation and touch controls.
-- Continuous vertical scrolling for webtoon-style chapters.
-- Manga tracking and reading history.
-- Import local manga and comic files.
-- Custom reading settings, including zoom and reading direction.
-- Reader clock with time and date options.
-- Optional menu sound effects.
-- Improved image loading and website compatibility.
-- Optional PC bridge for websites the PS Vita cannot access directly.
 
-## What's new in this version?
+### ⚡ Performance Improvements
 
-This version adds site-loading, reader, and network improvements on top of the original Noboru project. More details are available in [CHANGELOG.md](CHANGELOG.md).
+- JPEG image loading for faster image display.
+- Smaller JPEG chapter covers.
+- Improved handling of manga chapter images.
+- Better compatibility with different website layouts.
+- Improved handling of lazy-loaded images.
 
-### JPEG image loading
+### 🕒 Reader Clock
 
-Manga pages and chapter covers can be converted to JPEG to help reduce image sizes and improve loading performance.
-
-Change this option under:
-
-`Settings → Network → All pages + covers to JPEG`
-
-### Improved website compatibility
-
-The generic site reader has been improved to support more website layouts and ways of loading chapter images. This includes support for reader scripts and Next.js data, additional lazy-loading attributes, and layouts used by Madara and MangaThemesia sites.
-
-### Online site profiles
-
-Noboru can identify supported website engines and use online source-list information to help recognize a site's name, language, and other details.
-
-**Important:** Aidoku's executable extensions cannot run in Noboru. This feature uses the published source-list data only.
-
-Additional source-list URLs can be added, one per line, in:
-
-`ux0:data/noboru/profile_sources.txt`
-
-### Reader clock
-
-Display the time, date, or both while reading manga.
+The updated reader includes clock options so you can see the time while reading.
 
 Available settings:
-- Off
-- Time
-- Date
-- Time + Date
-- 12-hour or 24-hour time
-- Top-left or top-right position
 
-Find these options under:
+- Enable or disable the reader clock.
+- Display the current time.
+- Display the current date.
+- Choose the clock position.
+- Switch between 12-hour and 24-hour time formats.
 
-`Settings → Reader`
+### 🔊 Interface Sounds
 
-### Webtoon reader
+- Added menu sound effects.
+- Button sounds when navigating the application.
+- Option to enable or disable interface sounds in Settings → Controls.
 
-Read a complete chapter using continuous vertical scrolling instead of moving between individual pages. This mode is also available when using vertical orientation.
+### 🌐 Website Compatibility
 
-### Optional PC Cloudflare bridge
+Additional website-reading improvements include:
 
-Some websites use Cloudflare or other protections that the PS Vita cannot handle by itself. Noboru includes an optional PC bridge using `vitaserver.py` or `CFBridge.exe` to handle supported requests through a computer.
+- Better handling of different website layouts.
+- Support for additional manga website engines.
+- Improved chapter image detection.
+- Handling of websites that use JavaScript-generated chapter data.
+- Online website profiles using community source-list information.
 
-**Note:** The bridge does not guarantee that every website will work. Some sites may still require VitaSurf or may remain incompatible.
+---
 
-### Menu sounds
+## ☁️ Cloudflare Support – PC Bridge
 
-Short interface sounds provide feedback when navigating menus. They can be switched on or off under:
+Some manga websites use Cloudflare protection, which can prevent the PS Vita from accessing their pages directly.
 
-`Settings → Controls`
+The optional PC Bridge provides another way to access supported websites.
 
-## Installation
+### How it works
 
-1. Open the [Noboru Update GitHub repository](https://github.com/limeking614-dev/NOBORU-UPDATE).
-2. Download an available VPK from the [Releases page](https://github.com/limeking614-dev/NOBORU-UPDATE/releases).
-3. Transfer the VPK to your PS Vita or PS TV.
-4. Open VitaShell and locate the VPK.
-5. Press **X** to install it.
-6. Launch Noboru from the LiveArea.
+1. Run the PC Bridge application on your Windows computer.
+2. Connect your PS Vita and computer to the same network.
+3. Configure the bridge using the provided PC server files.
+4. Open Noboru and access a website that requires the bridge.
+5. Noboru can use the PC connection to help retrieve content from supported websites.
 
-## Importing manga for offline reading
+**Important:** The PC Bridge does not guarantee access to every Cloudflare-protected website. Some websites may still block requests.
 
-You can import your own manga and comics into Noboru in these ways:
+---
 
-- Import a folder containing images.
-- Import a folder containing multiple folders of images.
-- Import a `.CBZ` or `.ZIP` archive.
-- Import an individual `.CBZ` or `.ZIP` file.
+## 📦 Offline Manga Reading
 
-Supported image formats inside archives:
-- JPG
-- JPEG
+You can also read manga that you already have stored on your PS Vita.
+
+Supported import options:
+
+- Individual CBZ files.
+- ZIP archives.
+- Folders containing manga images.
+- Folders containing multiple manga folders.
+
+Supported image formats:
+
+- JPG / JPEG
 - PNG
 - BMP
 - GIF
 
-**Not currently supported:** WebP images and CBR/RAR archives.
+**Note:** WebP images are not supported directly. CBR/RAR archives are also currently unsupported.
 
-Folders being imported should contain image files only.
+---
 
-## Requirements
+## Installation
 
-The original README lists these approximate memory requirements:
+### Requirements
 
-- 50–60 MB for online reading.
-- More than 100 MB for offline reading.
+- PlayStation Vita or PS TV.
+- HENkaku / Ensō.
+- VitaShell.
+- Internet connection for online reading.
+- Approximately 50–60 MB of available memory for online reading.
+- More than 100 MB recommended for offline reading.
 
-Actual memory use may vary depending on the manga, chapter, and device.
+### Installing Noboru
 
-## Data and storage
+1. Visit the [GitHub Releases page](https://github.com/limeking614-dev/NOBORU-UPDATE/releases).
+2. Download the latest available VPK.
+3. Transfer the VPK to your PS Vita.
+4. Open VitaShell.
+5. Locate the downloaded VPK.
+6. Press X to install.
+7. Launch Noboru from the LiveArea.
 
-Noboru stores its application data in:
+---
+
+## 📁 Application Data
+
+Noboru stores its application data in the following directory:
 
 `ux0:data/noboru/`
 
-This folder contains cached manga information, downloaded chapters, imported files, catalog parsers, custom manga settings, and application settings.
-
-Deleting the `noboru` folder resets the application's stored data and settings. Back up anything important before deleting it.
-
-## Backup
-
-The original project stores different information in separate files and folders. Important items to back up include:
-
-| File or folder | What it contains |
+| Folder / File | Description |
 |---|---|
-| `save.dat` | Library list |
+| `cache/` | Cached manga information and history |
+| `chapters/` | Downloaded manga chapters |
+| `import/` | Local manga files |
+| `parsers/` | Manga catalog parsers |
+| `cusettings/` | Individual manga settings |
+| `save.dat` | Library information |
 | `settings.ini` | Application settings |
-| `history.dat` and `info.txt` | History information |
-| `info.txt` and cache folders | Bookmarks and covers |
-| `c.c` and chapter folders | Saved chapter information and chapters |
-| `cusettings/*.ini` | Custom manga settings |
+| `siteprofiles.lua` | Website profile information |
 
-If you want to keep downloaded chapters that you may not be able to find online again, back up the history information as well as the chapter files.
+**Backing up your data:** Make a copy of your Noboru data folder before reinstalling or resetting the application.
 
-## Troubleshooting and FAQ
+---
 
-### The catalog is empty
+## ❗ Known Issues
 
-Open the Catalog tab and press **Triangle** to refresh the catalog list.
+Noboru is still being improved. Some websites may not work correctly.
 
-### A website shows "Couldn't read the site"
+Possible issues include:
 
-The message below the title should explain the reason, such as a connection problem, Cloudflare protection, an empty page, or an unsupported layout.
+- Some manga sources may fail to load.
+- Certain chapters may not display their images.
+- Some websites may use Cloudflare protection.
+- Some websites may have unsupported layouts.
+- Some parsers may stop working when a website changes.
+- Image loading can depend on your internet connection.
 
-- Press **Cross** to check the site again.
-- Press **Triangle** to open the site in VitaSurf, or the Vita browser if VitaSurf is not installed.
-- Press **Circle** to open the source anyway.
+If you experience a problem, please report it through the [GitHub Issues page](https://github.com/limeking614-dev/NOBORU-UPDATE/issues).
 
-Some websites may still be incompatible.
+When reporting an issue, include:
 
-### A chapter only displays one image
+- The manga website or source.
+- The manga title.
+- The chapter that failed.
+- A screenshot of the error, if possible.
 
-The website may have caused its logo or a loading image to be detected as the chapter page. If this continues, report the website and chapter so the issue can be investigated.
+---
 
-### Some images do not load
+## 🛠️ Building From Source
 
-Check that the image format is supported. If the problem continues, include the website, manga title, chapter, and page when reporting the issue.
+This project uses Lua and the NOBORU PlayStation Vita runtime.
 
-### How do I show the clock while reading?
-
-Go to `Settings → Reader` and change **Clock in reader** to Time, Date, or Time + Date. You can also change the clock position and 24-hour option.
-
-### How do I turn off site checks, online profiles, or JPEG conversion?
-
-Open `Settings → Network` and adjust the relevant options:
-- Check site when opened
-- Online site profiles (Aidoku list)
-- All pages + covers to JPEG
-
-### How do I open the debug console?
-
-Press **DPAD_LEFT + START**.
-
-### How do I configure a proxy?
-
-The original application supports proxy addresses and proxy types such as HTTP, HTTPS, SOCKS4a, SOCKS5, and SOCKS5h. Enter the appropriate address and type in the network settings.
-
-## Known limitations
-
-- Not every manga website is supported.
-- Some websites require the optional PC bridge or VitaSurf.
-- Paywalled, locked, or login-only chapters are not unlocked.
-- Aidoku executable extensions cannot run in Noboru; only source-list data is used for site profiles.
-- WebP images and CBR/RAR archives are not supported for local imports.
-
-## Building from source
-
-To build the application:
+To build the VPK:
 
 1. Download or clone this repository.
-2. Set up the required PS Vita development environment.
-3. Run `build.bat`.
-4. The build process should create the VPK.
+2. Make sure the required build tools are installed.
+3. Open the project folder.
+4. Execute `build.bat`.
+5. Wait for the build process to finish.
+6. Locate the generated VPK.
 
-## Credits
+---
 
-- **Creckeryop** – Original Noboru project: [NOBORU](https://github.com/Creckeryop/NOBORU).
-- **VitaSurf / NetSurf** – Browser used by the Cloudflare bridge.
-- **Aidoku Community** – Public source-list data used for site profiles.
-- **wsrv.nl** – Image conversion service used by the JPEG option.
-- **Rinnegatamante** – [LuaPlayerPlus Vita](https://github.com/Rinnegatamante/lpp-vita).
-- **VitaSDK** – PlayStation Vita development tools.
-- **xerpi** – [libvita2d](https://github.com/xerpi/libvita2d).
-- **theFloW** – [VitaShell](https://github.com/TheOfficialFlow/VitaShell) and related contributions.
-- **Translation contributors** – Thank you to everyone who contributed translations to the original project.
+## Credits and Original Authors
 
-This repository contains modifications and additional features built on top of the original Noboru project.
+This project would not exist without the original developers and contributors.
 
-## Links
+- **[Creckeryop](https://github.com/Creckeryop/NOBORU)** – Original NOBORU application and development.
+- **[Rinnegatamante](https://github.com/Rinnegatamante/lpp-vita)** – Lua Player Plus for PS Vita.
+- **[VitaSDK](https://github.com/vitasdk)** – PlayStation Vita development tools.
 
-- [Noboru Update – GitHub](https://github.com/limeking614-dev/NOBORU-UPDATE)
-- [Original Noboru – GitHub](https://github.com/Creckeryop/NOBORU)
-- [Original Noboru Parser Repository](https://github.com/Creckeryop/NOBORU-parsers)
+Additional contributors and translators are credited in the original project.
+
+---
+
+## About This Project
+
+This is an independently maintained update to the original NOBORU application.
+
+The purpose of this project is to improve the manga-reading experience on the PS Vita, introduce additional features, improve website compatibility, and keep the application useful for the PS Vita homebrew community.
+
+I am not the original author of NOBORU. All original development credit belongs to the original developers.
+
+**Thank you to everyone supporting the PS Vita homebrew community!** ❤️
