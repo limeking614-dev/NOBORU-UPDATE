@@ -51,7 +51,6 @@ Paywalled, locked or login-only chapters are not unlocked. A site that blocks th
 - [Credits](#credits)
 ## Requirements
 * 50 - 60 MB memory for online reading
-* Optional: [VitaSurf](#vitasurf-bridge) for Cloudflare-protected sites
 * More than 100 MB memory for offline reading (please make sure you have enough memory)
 ## Data structure
 |Path|Description|
@@ -68,8 +67,6 @@ Paywalled, locked or login-only chapters are not unlocked. A site that blocks th
 |```ux0:data/noboru/profile_sources.txt```| optional: extra online source-list URLs for site profiles, one per line |
 |```ux0:data/noboru/cfbridge.lua```| sites sent through the PC Cloudflare bridge |
 |```ux0:data/noboru/vitaserver.lua```| address of the PC server |
-|```ux0:data/noboru/vitasurf_home.txt```| VitaSurf's own start page / user agent, kept while NOBORU has changed them |
-|```ux0:data/VitaSurf/Cookies```| (VitaSurf's file) read by NOBORU for the Cloudflare cookie |
 
 You can just delete `noboru` folder to reset all settings
 ## Importing
@@ -128,7 +125,7 @@ If you want to backup, here's what you can backup
 - **How do I show the time while reading?**
     - Settings > Reader > "Clock in reader" (Off / Time / Date / Time + Date), then "Clock position" (top left / top right) and "Clock 24 hour time"
 - **How do I turn off the site check / online lookups / JPEG conversion?**
-    - Settings > Network: "Check site when opened", "Online site profiles (Aidoku list)", "All pages + covers to JPEG", "VitaSurf for Cloudflare sites"
+    - Settings > Network: "Check site when opened", "Online site profiles (Aidoku list)", "All pages + covers to JPEG",
 ## Building
 Execute `build.bat` to create working .vpk
 ## TODO
