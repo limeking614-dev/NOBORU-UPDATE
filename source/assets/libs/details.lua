@@ -18,6 +18,15 @@ local LINE_HEIGHT = 22
 
 local chaptersMaxHeightOffset = 0
 local descriptionMaxHeightOffset = 0
+local summaryTouch, summaryDragged = false, false
+local summaryTouchY = 0
+
+local function summaryScrollLimit()
+	local viewport = math.max(0, chaptersMaxHeightOffset - 84)
+	local last = descriptionWordList[#descriptionWordList]
+	local height = last and ((#descriptionWordList - 1) * LINE_HEIGHT + Font.getTextHeight(FONT16, last)) or 0
+	return math.max(0, height - viewport)
+end
 
 local function chapterY(index)
 	return index * 80 + CONTENT_TOP - 95 - slider.Y + chaptersMaxHeightOffset
@@ -28,7 +37,7 @@ local function chapterAt(y)
 end
 
 local fade = 0
-local oldFade = 1
+local fadeFrom = 0
 
 local crossIcon = Image:new(Graphics.loadImage("app0:assets/icons/cross.png"))
 local menuIcon = Image:new(Graphics.loadImage("app0:assets/icons/menu.png"))
@@ -79,17 +88,13 @@ local function updateScrolling()
 	end
 end
 
-local easingFunction = EaseInOutCubic
-
 ---Updates animation of fade in or out
 local function updateAnimations()
 	if status == "START" then
-		fade = easingFunction(math.min((Timer.getTime(fadeTimer) / 250), 1))
+		fade = UI.transition(fadeFrom, 1, fadeTimer, UI.motion.enter)
 	elseif status == "WAIT" then
-		if fade == 0 then
-			status = "END"
-		end
-		fade = 1 - easingFunction(math.min((Timer.getTime(fadeTimer) / 250), 1))
+		fade = UI.transition(fadeFrom, 0, fadeTimer, UI.motion.exit)
+		if fade == 0 then status = "END" end
 	end
 
 	if ParserManager.check(chaptersList) then
@@ -106,7 +111,11 @@ local function updateMangaDescriptionMaxHeight()
 	local toggle = #descriptionWordList > 2
 	local target = math.min(448, lines * LINE_HEIGHT + (toggle and 84 or 52))
 	chaptersMaxHeightOffset = UI.approach(chaptersMaxHeightOffset, target, 65)
-	if not is_description_expanded then descriptionMaxHeightOffset = UI.approach(descriptionMaxHeightOffset, 0, 65) end
+	if not is_description_expanded then
+		descriptionMaxHeightOffset = UI.approach(descriptionMaxHeightOffset, 0, 65)
+	else
+		descriptionMaxHeightOffset = math.min(descriptionMaxHeightOffset, summaryScrollLimit())
+	end
 end
 
 -- Wrap once when the summary arrives; keep a natural, left-aligned word spacing.
@@ -131,6 +140,8 @@ local function updateMangaDescription(newDescription)
 		if line ~= "" then lines[#lines + 1], line = line, "" end
 	end
 	descriptionWordList = lines
+	LINE_HEIGHT = 22
+	for _, text in ipairs(lines) do LINE_HEIGHT = math.max(LINE_HEIGHT, Font.getTextHeight(FONT16, text) + 4) end
 end
 
 ---Updates `chaptersList` when it's ready
@@ -202,7 +213,6 @@ function Details.setManga(manga)
 	if manga then
 		selectedManga = manga
 		status = "START"
-		oldFade = 1
 		slider.Y = -50
 		slider.V = 0
 		chaptersMaxHeightOffset = 0
@@ -233,7 +243,9 @@ function Details.setManga(manga)
 
 		descriptionWordList = {}
 		descriptionMaxHeightOffset = 0
+		summaryTouch, summaryDragged = false, false
 
+		fadeFrom = fade
 		Timer.reset(fadeTimer)
 	end
 end
@@ -328,6 +340,25 @@ end
 ---Updates input for Details menu
 function Details.input(oldPad, pad, oldTouch, touch)
 	if status == "START" then
+		-- The expanded summary owns drags within its body; chapter scrolling stays separate.
+		if is_description_expanded and touch.x and not oldTouch.x and touch.x >= 278 and touch.x <= 945
+			and touch.y >= CONTENT_TOP + 38 and touch.y < CONTENT_TOP + chaptersMaxHeightOffset - 46 then
+			summaryTouch, summaryDragged, summaryTouchY = true, false, touch.y
+			slider.V, slider.ItemID = 0, 0
+			TOUCH_MODES.MODE = TOUCH_MODES.NONE
+		end
+		if summaryTouch then
+			if touch.x and oldTouch.x then
+				if math.abs(touch.y - summaryTouchY) > 8 then summaryDragged = true end
+				if summaryDragged then
+					descriptionMaxHeightOffset = math.max(0, math.min(summaryScrollLimit(), descriptionMaxHeightOffset + oldTouch.y - touch.y))
+				end
+			elseif not touch.x then
+				if not summaryDragged then is_description_expanded = false end
+				summaryTouch = false
+			end
+			return
+		end
 		local oldTouchMode = TOUCH_MODES.MODE
 		if TOUCH_MODES.MODE == TOUCH_MODES.NONE and oldTouch.x and touch.x and touch.x > 240 then
 			TOUCH_MODES.MODE = TOUCH_MODES.READ
@@ -350,14 +381,14 @@ function Details.input(oldPad, pad, oldTouch, touch)
 			end
 			TOUCH_MODES.MODE = TOUCH_MODES.NONE
 		end
-		local is_description_scrollable = not (is_description_expanded and #descriptionWordList * LINE_HEIGHT > chaptersMaxHeightOffset - 84)
+		local is_description_scrollable = not (is_description_expanded and summaryScrollLimit() > 0)
 		if is_description_scrollable then
 			detailsSelector:input(#chaptersList, oldPad, pad, touch.x)
 		else
 			if Controls.check(pad, SCE_CTRL_UP) then
-				descriptionMaxHeightOffset = math.max(descriptionMaxHeightOffset - 3, 0)
+				descriptionMaxHeightOffset = math.max(descriptionMaxHeightOffset - UI.dt * 0.3, 0)
 			elseif Controls.check(pad, SCE_CTRL_DOWN) then
-				descriptionMaxHeightOffset = math.min(descriptionMaxHeightOffset + 3, math.max(0, #descriptionWordList * LINE_HEIGHT - math.max(0, chaptersMaxHeightOffset - 84)))
+				descriptionMaxHeightOffset = math.min(descriptionMaxHeightOffset + UI.dt * 0.3, summaryScrollLimit())
 			end
 		end
 		if oldTouch.x and not touch.x then
@@ -376,8 +407,8 @@ function Details.input(oldPad, pad, oldTouch, touch)
 						status = "WAIT"
 						Loading.setStatus("NONE")
 						ParserManager.remove(chaptersList)
+						fadeFrom = fade
 						Timer.reset(fadeTimer)
-						oldFade = fade
 					end
 				else
 					deleteArmed = true
@@ -400,8 +431,8 @@ function Details.input(oldPad, pad, oldTouch, touch)
 			status = "WAIT"
 			Loading.setStatus("NONE")
 			ParserManager.remove(chaptersList)
+			fadeFrom = fade
 			Timer.reset(fadeTimer)
-			oldFade = fade
 		elseif is_description_scrollable and Controls.check(pad, SCE_CTRL_SQUARE) and not Controls.check(oldPad, SCE_CTRL_SQUARE) and selectedManga.ParserID ~= "IMPORTED" then
 			local id = detailsSelector.getSelected()
 			if Settings.ChapterSorting == "N->1" then
@@ -462,7 +493,7 @@ end
 ---Draws Details menu
 function Details.draw()
 	if status == "END" then return end
-	local M = oldFade * fade
+	local M = fade
 	local shift = (1 - M) * 24
 	local backgroundColor = UI.color("BACK", M)
 	local textColor = UI.color("FONT", M)
@@ -550,9 +581,15 @@ function Details.draw()
 		local count = is_description_expanded and #descriptionWordList or math.min(2, #descriptionWordList)
 		for i = 1, count do
 			local y = bodyTop + (i - 1) * LINE_HEIGHT - descriptionMaxHeightOffset
-			if y >= bodyTop and y + Font.getTextHeight(FONT16, descriptionWordList[i]) <= bodyBottom then
+			if y >= bodyTop - 0.01 and y + Font.getTextHeight(FONT16, descriptionWordList[i]) <= bodyBottom + 0.01 then
 				Font.print(FONT16, SUMMARY_LEFT, y, descriptionWordList[i], secondTextColor)
 			end
+		end
+		if is_description_expanded and bodyBottom > bodyTop and summaryScrollLimit() > 0 then
+			local viewport = bodyBottom - bodyTop
+			local thumb = math.min(viewport, math.max(24, viewport * viewport / (viewport + summaryScrollLimit())))
+			local top = bodyTop + (viewport - thumb) * descriptionMaxHeightOffset / summaryScrollLimit()
+			UI.roundRect(936, 940, top, top + thumb, secondTextColor)
 		end
 		if toggle then
 			local label = Language[Settings.Language].DETAILS[is_description_expanded and "SHRINK" or "EXPAND"]
@@ -607,7 +644,7 @@ end
 ---@return number
 ---Gives fade
 function Details.getFade()
-	return fade * oldFade
+	return fade
 end
 
 ---@return table

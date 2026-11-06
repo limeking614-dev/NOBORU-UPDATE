@@ -1,5 +1,7 @@
 -- Lightweight shared UI primitives; uses only the bundled runtime's drawing API.
 UI = { dt = 1000 / 60 }
+-- Milliseconds: respond immediately on entry, clear the scene faster on exit.
+UI.motion = { enter = 160, exit = 110, dialog = 200, focus = 55, scroll = 70 }
 local ticker = Timer.new()
 local sidebarBands = {}
 local sidebarTheme
@@ -67,6 +69,14 @@ end
 function UI.approach(value, target, ms)
 	local nextValue = value + (target - value) * (1 - math.exp(-UI.dt / ms))
 	return math.abs(nextValue - target) < 0.01 and target or nextValue
+end
+
+-- Absolute elapsed time gives finite, refresh-rate-independent transitions.
+-- Capture the current value when resetting the timer to reverse without a jump.
+function UI.transition(from, target, timer, ms)
+	local t = math.min(1, math.max(0, Timer.getTime(timer) / ms))
+	local eased = target > from and (1 - (1 - t) ^ 3) or t * t
+	return from + (target - from) * eased
 end
 
 function UI.sidebar()
@@ -148,14 +158,15 @@ function UI.roundBorder(x1, x2, y1, y2, radius, thickness, color)
 end
 
 -- Shared focus treatment for cover tiles and catalog source cards.
-function UI.focusBorder(left, right, top, bottom, radius, opacity)
+function UI.focusBorder(left, right, top, bottom, radius, opacity, thickness)
 	opacity = opacity or 1
+	thickness = thickness or 2
 	local pulse = (1 - math.cos(Timer.getTime(GlobalTimer) * math.pi / 900)) / 2
 	for spread = 3, 1, -1 do
 		UI.roundBorder(left - spread, right + spread, top - spread, bottom + spread, radius + spread, 1, UI.color("SELECTOR", (22 + 36 * pulse) * (4 - spread) / 765 * opacity))
 	end
-	UI.roundBorder(left, right, top, bottom, radius, 2, UI.color("SELECTOR", (165 + 90 * pulse) / 255 * opacity))
-	UI.roundBorder(left + 2, right - 2, top + 2, bottom - 2, radius - 2, 1, UI.color("HIGHLIGHT", (65 + 105 * pulse) / 255 * opacity))
+	UI.roundBorder(left, right, top, bottom, radius, thickness, UI.color("SELECTOR", (165 + 90 * pulse) / 255 * opacity))
+	UI.roundBorder(left + thickness, right - thickness, top + thickness, bottom - thickness, radius - thickness, 1, UI.color("HIGHLIGHT", (65 + 105 * pulse) / 255 * opacity))
 end
 
 function UI.listCard(top, bottom, active)

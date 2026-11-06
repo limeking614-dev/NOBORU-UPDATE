@@ -1609,7 +1609,7 @@ function Catalogs.draw()
 			local item = mangaSelector:getSelected()
 			if item ~= 0 then
 				local x, y = Grid.x(item), gridY(item)
-				UI.focusBorder(x, x + layout.width, y, y + layout.height, 10)
+				UI.focusBorder(x, x + layout.width, y, y + layout.height, 10, nil, 4)
 			end
 		else
 			if status == "LIBRARY" then
@@ -1648,9 +1648,9 @@ function Catalogs.draw()
 	if item and item ~= 0 then
 		local y = item * 75 - slider.Y
 		if status == "CATALOGS" or status == "IMPORT" or status == "PCSOURCES" or status == "DOWNLOAD" then
-			UI.focusBorder(215, 945, y - 70, y - 3, 10)
+			UI.focusBorder(215, 945, y - 70, y - 3, 10, nil, 4)
 		elseif status == "SETTINGS" then
-			UI.focusBorder(215, 945, y - 73, y - 2 + itemHeight, 10)
+			UI.focusBorder(215, 945, y - 73, y - 2 + itemHeight, 10, nil, 4)
 		end
 	end
 	if isGrid() then

@@ -146,6 +146,34 @@ for _ = 1, 20 do Details.update() end
 labels = {}
 Details.draw()
 assert(labels[Language.English.DETAILS.SHRINK], 'summary must expand and offer collapse')
+-- Expanded summaries longer than the screen must expose their final lines by touch and D-pad.
+local paragraphs = {}
+for i = 1, 60 do paragraphs[i] = 'Summary line ' .. i end
+open(table.concat(paragraphs, '\n'))
+Details.input(0, SCE_CTRL_LTRIGGER, {}, {})
+for _ = 1, 60 do Details.update() end
+labels = {}
+Details.draw()
+assert(labels['Summary line 1'] and not labels['Summary line 60'])
+local previousRead = read
+for _ = 1, 8 do
+	local start, finish = { x = 500, y = 430 }, { x = 500, y = 130 }
+	Details.input(0, 0, {}, start)
+	Details.input(0, 0, start, finish)
+	Details.input(0, 0, finish, {})
+end
+labels = {}
+Details.draw()
+assert(labels['Summary line 60'], 'touch scrolling must reach the final summary line')
+assert(labels[Language.English.DETAILS.SHRINK] and read == previousRead, 'summary drags must not collapse or open chapters')
+for _ = 1, 400 do Details.input(0, SCE_CTRL_UP, {}, {}) end
+labels = {}
+Details.draw()
+assert(labels['Summary line 1'], 'D-pad must scroll back to the first summary line')
+for _ = 1, 400 do Details.input(0, SCE_CTRL_DOWN, {}, {}) end
+labels = {}
+Details.draw()
+assert(labels['Summary line 60'], 'D-pad must reach the final summary line')
 Details.input(0, SCE_CTRL_CIRCLE, {}, {})
 now = now + 300
 Details.update()

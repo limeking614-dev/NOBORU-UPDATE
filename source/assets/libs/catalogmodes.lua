@@ -2,7 +2,7 @@ CatalogModes = {}
 local status = "END"
 
 local fade = 0
-local oldFade = 0
+local fadeFrom = 0
 
 local animationTimer = Timer.new()
 
@@ -104,16 +104,12 @@ local function scrollUpdate()
 	if slider.Y == 0 or slider.Y == scrollLimit() then slider.V = 0 end
 end
 
-local easingFunction = EaseInOutCubic
-
 local function animationUpdate()
 	if status == "START" then
-		fade = easingFunction(math.min((Timer.getTime(animationTimer) / 220), 1))
+		fade = UI.transition(fadeFrom, 1, animationTimer, UI.motion.enter)
 	elseif status == "WAIT" then
-		if fade == 0 then
-			status = "END"
-		end
-		fade = 1 - easingFunction(math.min((Timer.getTime(animationTimer) / 220), 1))
+		fade = UI.transition(fadeFrom, 0, animationTimer, UI.motion.exit)
+		if fade == 0 then status = "END" end
 	end
 end
 
@@ -214,7 +210,7 @@ end
 
 function CatalogModes.show()
 	status = "START"
-	oldFade = 1
+	fadeFrom = fade
 	Timer.reset(animationTimer)
 	selectedIndex = math.max(1, nowMode)
 	slider.V = 0
@@ -231,8 +227,8 @@ local function setMode(id)
 			currentFinalLetter = currentLettersIndex
 			currentFinalTag = currentTagsIndex
 			status = "WAIT"
+			fadeFrom = fade
 			Timer.reset(animationTimer)
-			oldFade = fade
 			Catalogs.terminate()
 		end
 	end
@@ -240,8 +236,8 @@ end
 
 local function close()
 	status = "WAIT"
+	fadeFrom = fade
 	Timer.reset(animationTimer)
-	oldFade = fade
 end
 
 local function activate(index)
@@ -285,7 +281,7 @@ function CatalogModes.input(pad, oldpad, touch, oldtouch)
 	if status ~= "START" then return end
 	local function pressed(key) return Controls.check(pad, key) and not Controls.check(oldpad, key) end
 	if pressed(SCE_CTRL_CIRCLE) or pressed(SCE_CTRL_SQUARE) then close(); return end
-	local left = 960 - PANEL_WIDTH * fade * oldFade
+	local left = 960 - PANEL_WIDTH * fade
 	if touch.x and not oldtouch.x then
 		if touch.x < left or (touch.x >= 912 and touch.y >= 14 and touch.y < 50) or (touch.y >= CONTENT_BOTTOM and touch.x > left + PANEL_WIDTH / 2) then close(); return end
 		if touch.y >= CONTENT_TOP and touch.y < CONTENT_BOTTOM then
@@ -348,8 +344,8 @@ function CatalogModes.update()
 				end
 				searchData = data
 				status = "WAIT"
+				fadeFrom = fade
 				Timer.reset(animationTimer)
-				oldFade = fade
 				if data:gsub("%s", "") ~= "" then
 					Notifications.push(string.format(Language[Settings.Language].NOTIFICATIONS.SEARCHING, data))
 				end
@@ -361,7 +357,7 @@ end
 
 function CatalogModes.draw()
 	if status == "END" then return end
-	local M = oldFade * fade
+	local M = fade
 	local left = 960 - PANEL_WIDTH * M
 	local right = left + PANEL_WIDTH
 	Graphics.fillRect(0, 960, 0, 544, UI.color("OVERLAY", 0.55 * M))
@@ -435,7 +431,7 @@ function CatalogModes.getStatus()
 end
 
 function CatalogModes.getFade()
-	return fade * oldFade
+	return fade
 end
 
 function CatalogModes.getMangaMode()

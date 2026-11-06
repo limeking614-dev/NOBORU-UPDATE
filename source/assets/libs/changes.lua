@@ -3,8 +3,9 @@ local yFinal = 0
 local str
 Changes = {}
 
-local easingFunction = EaseInOutCubic
 local animationTimer = Timer.new()
+local visibility, from = 0, 0
+local wasActive = false
 
 local is_active = false
 local is_app_updating = false
@@ -32,17 +33,16 @@ function Changes.close(pad)
 end
 
 function Changes.update()
-	local time = Timer.getTime(animationTimer)
-	if is_active then
-		time = math.max(1 - time / 800, 0)
-	else
-		time = math.min(time / 800, 1)
-	end
-	yOffset = yFinal + 544 * easingFunction(time)
 	if is_app_updating and not Settings.isAppUpdating() then
 		is_app_updating = false
 		is_active = false
 	end
+	if wasActive ~= is_active then
+		from, wasActive = visibility, is_active
+		Timer.reset(animationTimer)
+	end
+	visibility = UI.transition(from, is_active and 1 or 0, animationTimer, is_active and UI.motion.dialog or UI.motion.exit)
+	yOffset = yFinal + (544 - yFinal) * (1 - visibility)
 end
 
 function Changes.draw()

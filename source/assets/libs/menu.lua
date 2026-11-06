@@ -114,9 +114,9 @@ end
 function Menu.update()
 	for _, section in ipairs(sections) do
 		local key = section[1]
-		buttonsAlpha[key] = UI.approach(buttonsAlpha[key] or 0, key == mode and 1 or 0, 85)
+		buttonsAlpha[key] = UI.approach(buttonsAlpha[key] or 0, key == mode and 1 or 0, UI.motion.focus)
 		if key == mode then
-			selectionY = UI.approach(selectionY, section[2], 75)
+			selectionY = UI.approach(selectionY, section[2], UI.motion.focus)
 		end
 	end
 	downloadIndicatorValue = UI.approach(downloadIndicatorValue, ChapterSaver.is_download_running() and 1 or 0, 120)

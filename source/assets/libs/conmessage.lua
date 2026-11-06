@@ -4,9 +4,10 @@ local yOffset = 544
 local yFinal = 0
 local str
 
-local easingFunction = EaseInOutCubic
 local animationTimer = Timer.new()
 local connectionTimer = Timer.new()
+local visibility, from = 0, 0
+local wasActive = false
 
 local is_active = false
 
@@ -26,9 +27,7 @@ function ConnectMessage.input(pad)
 end
 
 function ConnectMessage.update()
-	local time = Timer.getTime(animationTimer)
 	if is_active then
-		time = math.max(1 - time / 800, 0)
 		if Timer.getTime(connectionTimer) > 1000 then
 			if Threads.netActionUnSafe(Network.isWifiEnabled) then
 				is_active = false
@@ -36,10 +35,14 @@ function ConnectMessage.update()
 			Timer.reset(connectionTimer)
 		end
 	else
-		time = math.min(time / 800, 1)
 		Timer.reset(connectionTimer)
 	end
-	yOffset = yFinal + 544 * easingFunction(time)
+	if wasActive ~= is_active then
+		from, wasActive = visibility, is_active
+		Timer.reset(animationTimer)
+	end
+	visibility = UI.transition(from, is_active and 1 or 0, animationTimer, is_active and UI.motion.dialog or UI.motion.exit)
+	yOffset = yFinal + (544 - yFinal) * (1 - visibility)
 end
 
 function ConnectMessage.draw()

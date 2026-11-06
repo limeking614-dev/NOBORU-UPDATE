@@ -188,6 +188,7 @@ if Controls.check(pad, SCE_CTRL_SELECT) then
 end
 
 local fade = 1
+local launchFadeTimer = Timer.new()
 
 local function input()
 	UI.update()
@@ -258,10 +259,7 @@ local function update()
 		Changes.update()
 	end
 	if fade > 0 then
-		fade = UI.approach(fade, 0, 90)
-		if fade < 1 / 254 then
-			fade = 0
-		end
+		fade = UI.transition(1, 0, launchFadeTimer, UI.motion.dialog)
 	end
 	if AppMode == MENU then
 		Menu.update()

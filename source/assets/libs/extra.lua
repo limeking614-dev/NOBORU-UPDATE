@@ -27,7 +27,7 @@ local EXTRA_MENU_READER = {"OpenInBrowser", "ReaderWebtoon", "ReaderOrientation"
 local EXTRA_MENU_READER_IMPORTED = {--[["OpenInBrowser",]] "ReaderWebtoon", "ReaderOrientation", "ReaderDirection", "ZoomReader", "DownloadImageToMemory"}
 
 local fade = 0
-local oldFade = 1
+local fadeFrom = 0
 local maxExtraMenuWidth = 0
 local extraMenuYDrawStart = 0
 
@@ -50,10 +50,11 @@ local extraSelector =
 local function updateScrolling()
 	local selectedItem = extraSelector.getSelected()
 	if selectedItem ~= 0 then
-		slider.Y = slider.Y + (selectedItem * 64 - 272 - slider.Y) / 8
+		slider.Y = UI.approach(slider.Y, selectedItem * 64 - 272, UI.motion.scroll)
 	end
-	slider.Y = slider.Y + slider.V
-	slider.V = slider.V / 1.12
+	local decay = math.pow(1 / 1.12, UI.dt / (1000 / 60))
+	slider.Y = slider.Y + slider.V * (1 - decay) / (1 - 1 / 1.12)
+	slider.V = slider.V * decay
 	if math.abs(slider.V) < 0.1 then
 		slider.V = 0
 	end
@@ -66,17 +67,13 @@ local function updateScrolling()
 	end
 end
 
-local easingFunction = EaseInOutCubic
-
 ---Updates animation of fade in or out
 local function animationUpdate()
 	if status == "START" then
-		fade = easingFunction(math.min((Timer.getTime(fadeAnimationTimer) / 200), 1))
+		fade = UI.transition(fadeFrom, 1, fadeAnimationTimer, UI.motion.enter)
 	elseif status == "WAIT" then
-		if fade == 0 then
-			status = "END"
-		end
-		fade = 1 - easingFunction(math.min((Timer.getTime(fadeAnimationTimer) / 200), 1))
+		fade = UI.transition(fadeFrom, 0, fadeAnimationTimer, UI.motion.exit)
+		if fade == 0 then status = "END" end
 	end
 end
 
@@ -89,7 +86,6 @@ function Extra.setChapters(manga, chapters, page)
 		selectedPage = page
 		chaptersList = chapters
 		status = "START"
-		oldFade = 1
 		was_bookmarks_updated = false
 
 		slider.Y = -50
@@ -113,6 +109,7 @@ function Extra.setChapters(manga, chapters, page)
 			end
 		end
 		extraSelector:resetSelected()
+		fadeFrom = fade
 		Timer.reset(fadeAnimationTimer)
 		extraMenuYDrawStart = 272 - #selectedExtraMenu * 64 / 2 + 12
 		maxExtraMenuWidth = DEFAULT_MAX_EXTRA_MENU_WIDTH
@@ -155,10 +152,10 @@ function Extra.setLanguage()
 	selectedExtraMenu = {}
 	langToCode = {}
 	status = "START"
-	oldFade = 1
 	slider.Y = -50
 	updateLanguagePick()
 	extraSelector:resetSelected()
+	fadeFrom = fade
 	Timer.reset(fadeAnimationTimer)
 	extraMenuYDrawStart = 0
 	maxExtraMenuWidth = DEFAULT_MAX_EXTRA_MENU_WIDTH
@@ -442,8 +439,8 @@ function Extra.input(oldPad, pad, oldTouch, touch)
 					end
 				elseif mode == "setChapters" and oldTouch.x > 480 - maxExtraMenuWidth / 2 and oldTouch.x < 480 + maxExtraMenuWidth / 2 and oldTouch.y >= extraMenuYDrawStart + #selectedExtraMenu * 64 and oldTouch.y <= extraMenuYDrawStart + #selectedExtraMenu * 64 + 28 then
 					status = "WAIT"
+					fadeFrom = fade
 					Timer.reset(fadeAnimationTimer)
-					oldFade = fade
 				end
 			end
 			TOUCH_MODES.MODE = TOUCH_MODES.NONE
@@ -457,18 +454,18 @@ function Extra.input(oldPad, pad, oldTouch, touch)
 			end
 		elseif Controls.check(pad, SCE_CTRL_CIRCLE) and not Controls.check(oldPad, SCE_CTRL_CIRCLE) then
 			status = "WAIT"
+			fadeFrom = fade
 			Timer.reset(fadeAnimationTimer)
-			oldFade = fade
 		elseif Controls.check(pad, SCE_CTRL_START) and not Controls.check(oldPad, SCE_CTRL_START) then
 			status = "WAIT"
+			fadeFrom = fade
 			Timer.reset(fadeAnimationTimer)
-			oldFade = fade
 		elseif touch.x ~= nil and oldTouch.x == nil then
 			if touch.x > 480 - maxExtraMenuWidth / 2 and touch.x < 480 + maxExtraMenuWidth / 2 and touch.y > (mode == "setChapters" and extraMenuYDrawStart - 52 or extraMenuYDrawStart) and touch.y < extraMenuYDrawStart + 64 * #selectedExtraMenu + (mode == "setChapters" and 28 or 0) then
 			else
 				status = "WAIT"
+				fadeFrom = fade
 				Timer.reset(fadeAnimationTimer)
-				oldFade = fade
 			end
 		end
 		local newItemID = 0
@@ -485,7 +482,7 @@ function Extra.input(oldPad, pad, oldTouch, touch)
 			end
 		elseif TOUCH_MODES.MODE == TOUCH_MODES.SLIDE then
 			if touch.x and oldTouch.x then
-				slider.V = oldTouch.y - touch.y
+				slider.V = (oldTouch.y - touch.y) * (1000 / 60) / UI.dt
 			end
 		end
 		if slider.ItemID > 0 and newItemID > 0 and slider.ItemID ~= newItemID then
@@ -505,7 +502,7 @@ end
 
 function Extra.draw()
 	if status == "END" then return end
-	local M = oldFade * fade
+	local M = fade
 	local shift = (1 - M) * 20
 	local count = #selectedExtraMenu
 	local width = math.min(720, math.max(DEFAULT_MAX_EXTRA_MENU_WIDTH, maxExtraMenuWidth))
@@ -562,5 +559,5 @@ function Extra.getStatus()
 end
 
 function Extra.getFade()
-	return fade * oldFade
+	return fade
 end

@@ -26,6 +26,6 @@ Settings.SkipCacheChapterChecking = false
 local run = assert(load('return function(preloadData, logo) ' .. startup .. ' end'))()
 run(function() coroutine.yield('Loading library', 0.5) end, {e = 'original-logo'})
 assert(logos == 1 and labels['Loading library'] and progress == 480 and destroyed, 'restored loading screen must show its original logo, status and progress')
-assert(UI.capitalize('LIBRARY') == 'Library' and UI.capitalize('PC SOURCES') == 'Pc sources')
+assert(UI.capitalize('LIBRARY') == 'Library' and UI.capitalize('PC SOURCES') == 'PC Sources')
 assert(UI.capitalize('ÉTÉ') == 'Été' and UI.capitalize('БИБЛИОТЕКА') == 'Библиотека' and UI.capitalize('THƯ VIỆN') == 'Thư viện', 'sentence-case labels must preserve supported scripts')
 print('Launch checks passed: original logo/status/progress, safe completion, timer cleanup and sentence-case labels.')
