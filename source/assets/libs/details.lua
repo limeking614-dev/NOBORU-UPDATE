@@ -52,7 +52,7 @@ local detailsSelector =
 	-3,
 	3,
 	function()
-		return math.floor((slider.Y - 20 + 90) / 80)
+		return math.max(1, math.floor((slider.Y + 95) / 80))
 	end
 )
 
@@ -60,10 +60,12 @@ local detailsSelector =
 local function updateScrolling()
 	local selectedItem = detailsSelector.getSelected()
 	if selectedItem ~= 0 then
-		slider.Y = slider.Y + (selectedItem * 80 - (544 - chaptersMaxHeightOffset) / 2 - slider.Y) / 8
+		local target = selectedItem * 80 - (544 - chaptersMaxHeightOffset) / 2
+		slider.Y = UI.approach(slider.Y, math.max(-15, math.min(target, #chaptersList * 80 - 464 + chaptersMaxHeightOffset)), 90)
 	end
-	slider.Y = slider.Y + slider.V
-	slider.V = slider.V / 1.12
+	local decay = math.pow(1 / 1.12, UI.dt / (1000 / 60))
+	slider.Y = slider.Y + slider.V * (1 - decay) / (1 - 1 / 1.12)
+	slider.V = slider.V * decay
 	if math.abs(slider.V) < 0.1 then
 		slider.V = 0
 	end
@@ -81,12 +83,12 @@ local easingFunction = EaseInOutCubic
 ---Updates animation of fade in or out
 local function updateAnimations()
 	if status == "START" then
-		fade = easingFunction(math.min((Timer.getTime(fadeTimer) / 500), 1))
+		fade = easingFunction(math.min((Timer.getTime(fadeTimer) / 250), 1))
 	elseif status == "WAIT" then
 		if fade == 0 then
 			status = "END"
 		end
-		fade = 1 - easingFunction(math.min((Timer.getTime(fadeTimer) / 500), 1))
+		fade = 1 - easingFunction(math.min((Timer.getTime(fadeTimer) / 250), 1))
 	end
 	if Timer.getTime(mangaNameTickerTimer) > 3500 + maxMangaNameTickerTimeMs then
 		Timer.reset(mangaNameTickerTimer)
@@ -257,6 +259,9 @@ function Details.setManga(manga)
 		status = "START"
 		oldFade = 1
 		slider.Y = -50
+		slider.V = 0
+		chaptersMaxHeightOffset = 0
+		TOUCH_MODES.MODE = TOUCH_MODES.NONE
 
 		maxMangaNameTickerTimeMs = 50 * string.len(manga.Name)
 		maxMangaNameOffset = math.max(Font.getTextWidth(BONT30, manga.Name) - 960 + 88 + 88 + 88, 0)
@@ -387,8 +392,8 @@ function Details.input(oldPad, pad, oldTouch, touch)
 			slider.TouchY = touch.y
 		elseif TOUCH_MODES.MODE ~= TOUCH_MODES.NONE and not touch.x then
 			if TOUCH_MODES.MODE == TOUCH_MODES.READ and oldTouch.x then
-				if oldTouch.x > 320 and oldTouch.x < 955 and oldTouch.y > 90 + chaptersMaxHeightOffset then
-					local id = math.floor((slider.Y + oldTouch.y - 20 - chaptersMaxHeightOffset) / 80)
+				if oldTouch.x > 270 and oldTouch.x < 955 and oldTouch.y > 95 + chaptersMaxHeightOffset then
+					local id = math.floor((slider.Y + oldTouch.y - chaptersMaxHeightOffset) / 80)
 					if Settings.ChapterSorting == "N->1" then
 						id = #chaptersList - id + 1
 					end
@@ -478,8 +483,8 @@ function Details.input(oldPad, pad, oldTouch, touch)
 			if math.abs(slider.V) > 0.1 or math.abs(touch.y - slider.TouchY) > 10 then
 				TOUCH_MODES.MODE = TOUCH_MODES.SLIDE
 			else
-				if oldTouch.x > 320 and oldTouch.x < 900 and oldTouch.y > 90 + chaptersMaxHeightOffset then
-					local id = math.floor((slider.Y - 20 + oldTouch.y - chaptersMaxHeightOffset) / 80)
+				if oldTouch.x > 270 and oldTouch.x < 955 and oldTouch.y > 95 + chaptersMaxHeightOffset then
+					local id = math.floor((slider.Y + oldTouch.y - chaptersMaxHeightOffset) / 80)
 					if Settings.ChapterSorting == "N->1" then
 						id = #chaptersList - id + 1
 					end
@@ -490,7 +495,7 @@ function Details.input(oldPad, pad, oldTouch, touch)
 			end
 		elseif TOUCH_MODES.MODE == TOUCH_MODES.SLIDE then
 			if touch.x and oldTouch.x then
-				slider.V = oldTouch.y - touch.y
+				slider.V = (oldTouch.y - touch.y) * (1000 / 60) / UI.dt
 			end
 		end
 		if slider.ItemID > 0 and newItemID > 0 and slider.ItemID ~= newItemID then
@@ -514,128 +519,83 @@ end
 
 ---Draws Details menu
 function Details.draw()
-	if status ~= "END" then
-		local M = oldFade * fade
-		local Alpha = 255 * M
+	if status == "END" then return end
+	local M = oldFade * fade
+	local Alpha = 255 * M
+	local shift = (1 - M) * 24
+	local backgroundColor = Color.new(14, 24, 39, Alpha)
+	local textColor = Color.new(240, 246, 255, Alpha)
+	local secondTextColor = Color.new(153, 174, 199, Alpha)
+	local accentColor = Color.new(105, 197, 255, Alpha)
+	Graphics.fillRect(0, 960, 0, 544, backgroundColor)
+	Graphics.fillRect(0, 270, 90, 544, Color.new(18, 34, 54, Alpha))
 
-		local backgroundColor = Color.new(0, 0, 0, Alpha)
-		local textColor = Color.new(255, 255, 255, Alpha)
-		local secondTextColor = Color.new(128, 128, 128, Alpha)
-		local addMangaButtonColor = Color.new(42, 47, 78, Alpha)
-		local removeMangaButtonColor = Color.new(137, 30, 43, Alpha)
-		local continueButtonColor = Color.new(19, 76, 76, Alpha)
-
-		Graphics.fillRect(20, 260, 90, 544, backgroundColor)
-		local start = math.max(1, math.floor(slider.Y / 80) + 1)
-		local shift = (1 - M) * 544
-		local y = shift - slider.Y + start * 80 + chaptersMaxHeightOffset
-		local color, text = addMangaButtonColor, Language[Settings.Language].DETAILS.ADD_TO_LIBRARY
-
-		if Database.check(selectedManga) then
-			color = removeMangaButtonColor
-			text = Language[Settings.Language].DETAILS.REMOVE_FROM_LIBRARY
+	-- Cover and primary actions retain their established touch areas.
+	DrawDetailsManga(140, 250 + shift, selectedManga, 300 / MANGA_HEIGHT)
+	UI.roundCorners(40, 240, 100 + shift, 400 + shift, 12, Color.new(18, 34, 54, Alpha))
+	UI.roundBorder(40, 240, 100 + shift, 400 + shift, 12, 1, Color.new(119, 158, 192, 100 * M))
+	local following = Database.check(selectedManga)
+	local label = Language[Settings.Language].DETAILS[following and "REMOVE_FROM_LIBRARY" or "ADD_TO_LIBRARY"]
+	local libraryColor = following and Color.new(113, 47, 65, Alpha) or Color.new(29, 78, 126, Alpha)
+	UI.fillRoundRect(20, 260, 416 + shift, 475 + shift, 12, libraryColor)
+	Graphics.drawImage(30, 437 + shift, ButtonsIcons.Triangle.e, textColor)
+	label = FitText(FONT20, label, 186)
+	Font.print(FONT20, 153 - Font.getTextWidth(FONT20, label) / 2, 445 + shift - Font.getTextHeight(FONT20, label) / 2, label, textColor)
+	local listCount = #chaptersList
+	if continueChapterNumber and listCount > 0 then
+		UI.fillRoundRect(20, 260, 480 + shift, 539 + shift, 12, Color.new(19, 101, 120, Alpha))
+		Graphics.drawImage(30, 501 + shift, ButtonsIcons.Select.e, textColor)
+		local resume = continueChapterNumber > 0 and chaptersList[continueChapterNumber] and (continueChapterNumber ~= 1 or Cache.getBookmark(chaptersList[1]))
+		local buttonText = Language[Settings.Language].DETAILS[resume and "CONTINUE" or "START"]
+		buttonText = FitText(FONT20, buttonText, 186)
+		Font.print(FONT20, 153 - Font.getTextWidth(FONT20, buttonText) / 2, shift + (resume and 486 or 499), buttonText, textColor)
+		if resume then
+			local chapterName = FitText(FONT16, chaptersList[continueChapterNumber].Name or "", 186)
+			Font.print(FONT16, 153 - Font.getTextWidth(FONT16, chapterName) / 2, 514 + shift, chapterName, secondTextColor)
 		end
-		Graphics.fillRect(20, 260, shift + 416, shift + 475, color)
-		Font.print(FONT20, 140 - Font.getTextWidth(FONT20, text) / 2, shift + 444 - Font.getTextHeight(FONT20, text) / 2, text, textColor)
-		if continueChapterNumber then
-			if #chaptersList > 0 then
-				Graphics.fillRect(30, 250, shift + 480, shift + 539, continueButtonColor)
-				local continueButtonText = Language[Settings.Language].DETAILS.START
-				local chapterName
-				local dy = 0
-				if continueChapterNumber > 0 and chaptersList[continueChapterNumber] and (continueChapterNumber == 1 and Cache.getBookmark(chaptersList[continueChapterNumber]) or continueChapterNumber ~= 1) then
-					continueButtonText = Language[Settings.Language].DETAILS.CONTINUE
-					dy = -10
-					chapterName = chaptersList[continueChapterNumber].Name or ("Chapter " .. continueChapterNumber)
-				end
-				local continueButtonTextWidth = Font.getTextWidth(FONT20, continueButtonText)
-				local continueButtonTextHeight = Font.getTextHeight(FONT20, continueButtonText)
-				Font.print(FONT20, 140 - continueButtonTextWidth / 2, shift + 505 - continueButtonTextHeight / 2 + dy, continueButtonText, textColor)
-				if chapterName then
-					continueButtonTextWidth = math.min(Font.getTextWidth(FONT16, chapterName), 220)
-					local chapterNameTickerX = maxChapterNameOffset * math.min(math.max(0, Timer.getTime(chapterNameTickerTimer) - 1500), maxChapterNameTickerTimeMs) / maxChapterNameTickerTimeMs
-					Font.print(FONT16, 140 - continueButtonTextWidth / 2 - chapterNameTickerX, shift + 505 - continueButtonTextHeight / 2 + 18, chapterName, textColor)
-				end
-				Graphics.fillRect(20, 30, shift + 480, shift + 539, continueButtonColor)
-				Graphics.fillRect(250, 260, shift + 480, shift + 539, continueButtonColor)
+	end
+
+	local start = math.max(1, math.floor(slider.Y / 80) + 1)
+	local selected = detailsSelector:getSelected()
+	for n = start, math.min(listCount, start + 8) do
+		local y = shift - slider.Y + n * 80 + chaptersMaxHeightOffset
+		if y > 544 then break end
+		if y + 80 > 95 + chaptersMaxHeightOffset then
+			local i = Settings.ChapterSorting ~= "N->1" and n or listCount - n + 1
+			local chapter = chaptersList[i]
+			local bookmark = Cache.getBookmark(chapter)
+			local active = selected == n or slider.ItemID == i
+			UI.fillRoundRect(278, 945, y + 3, y + 77, 10, active and Color.new(30, 61, 92, Alpha) or Color.new(22, 39, 59, Alpha))
+			UI.roundBorder(278, 945, y + 3, y + 77, 10, 1, Color.new(103, 137, 170, 65 * M))
+			local name = FitText(BONT16, chapter.Name or ("Chapter " .. i), selectedManga.ParserID == "IMPORTED" and 620 or 550)
+			local titleColor = bookmark == true and secondTextColor or textColor
+			Font.print(BONT16, 294, y + (bookmark ~= nil and 16 or 29), name, titleColor)
+			if bookmark ~= nil then
+				local progress = bookmark == true and Language[Settings.Language].DETAILS.DONE or Language[Settings.Language].DETAILS.PAGE .. tostring(bookmark)
+				Font.print(FONT16, 294, y + 44, FitText(FONT16, progress, 550), secondTextColor)
 			end
-		end
-		Graphics.fillRect(0, 20, 90, 544, backgroundColor)
-		if continueChapterNumber and #chaptersList > 0 then
-			Graphics.drawImage(0, shift + 472, ButtonsIcons.Select.e)
-		end
-		Graphics.drawImageExtended(20, shift + 420, ButtonsIcons.Triangle.e, 0, 0, 16, 16, 0, 1, 1)
-		DrawDetailsManga(MANGA_COVER_CENTER_POINT.x, MANGA_COVER_CENTER_POINT.y + 544 * (1 - M), selectedManga, 326 / MANGA_HEIGHT)
-		Graphics.fillRect(260, 890 - 18, 90, 95, backgroundColor)
-		Graphics.fillRect(260, 890 - 18, 95 + chaptersMaxHeightOffset, 544, backgroundColor)
-		local listCount = #chaptersList
-		for n = start, math.min(listCount, start + 8) do
-			if y + 80 > 95 + chaptersMaxHeightOffset then
-				local i = Settings.ChapterSorting ~= "N->1" and n or listCount - n + 1
-				local bookmark = Cache.getBookmark(chaptersList[i])
-				if bookmark ~= nil and bookmark ~= true then
-					Font.print(FONT16, 290, y + 44, Language[Settings.Language].DETAILS.PAGE .. bookmark, textColor)
-					Font.print(BONT16, 290, y + 14, chaptersList[i].Name or ("Chapter " .. i), textColor)
-				elseif bookmark == true then
-					Font.print(FONT16, 290, y + 44, Language[Settings.Language].DETAILS.DONE, secondTextColor)
-					Font.print(BONT16, 290, y + 14, chaptersList[i].Name or ("Chapter " .. i), secondTextColor)
+			if selectedManga.ParserID ~= "IMPORTED" then
+				Graphics.fillRect(865, 866, y + 17, y + 63, Color.new(103, 137, 170, 45 * M))
+				if ChapterSaver.check(chapter) then
+					Graphics.drawImage(890, y + 28, crossIcon.e, secondTextColor)
 				else
-					Font.print(BONT16, 290, y + 28, chaptersList[i].Name or ("Chapter " .. i), textColor)
-				end
-			end
-			y = y + 80
-			if y > 544 then
-				break
-			end
-		end
-		Graphics.fillRect(890 - 18, 955, 90, 95, backgroundColor)
-		Graphics.fillRect(890 - 18, 955, 95 + chaptersMaxHeightOffset, 544, backgroundColor)
-		y = shift - slider.Y + start * 80 + chaptersMaxHeightOffset
-		for n = start, math.min(listCount, start + 8) do
-			if y + 80 > 95 + chaptersMaxHeightOffset then
-				local i = Settings.ChapterSorting ~= "N->1" and n or listCount - n + 1
-				if selectedManga.ParserID ~= "IMPORTED" then
-					if ChapterSaver.check(chaptersList[i]) then
-						Graphics.drawImage(920 - 14 - 18, y + 40 - 12, crossIcon.e)
+					local download = ChapterSaver.is_downloading(chapter)
+					if download then
+						local progress = download.page_count and download.page_count > 0 and math.min(100, math.ceil(100 * (download.page or 0) / download.page_count)) or 0
+						local percent = tostring(progress) .. "%"
+						Font.print(FONT20, 902 - Font.getTextWidth(FONT20, percent) / 2, y + 27, percent, accentColor)
 					else
-						local chapterDownloadInfo = ChapterSaver.is_downloading(chaptersList[i])
-						if chapterDownloadInfo then
-							local downloadProgressPercentageText = "0%"
-							if chapterDownloadInfo.page_count and chapterDownloadInfo.page_count > 0 then
-								downloadProgressPercentageText = math.ceil(100 * chapterDownloadInfo.page / chapterDownloadInfo.page_count) .. "%"
-							end
-							local width = Font.getTextWidth(FONT20, downloadProgressPercentageText)
-							Font.print(FONT20, 920 - width / 2 - 18, y + 26, downloadProgressPercentageText, COLOR_WHITE)
-						else
-							Graphics.drawImage(920 - 14 - 18, y + 40 - 12, DownloadIcon.e)
-						end
+						Graphics.drawImage(890, y + 28, DownloadIcon.e, accentColor)
 					end
 				end
-				if i == slider.ItemID then
-					Graphics.fillRect(270, 945, y, y + 79, Color.new(255, 255, 255, 24 * M))
-				end
 			end
-			y = y + 80
+			if selected == n then UI.focusBorder(278, 945, y + 3, y + 77, 10, M) end
 		end
-		if status == "START" and #chaptersList == 0 and not ParserManager.check(chaptersList) and not is_notification_showed then
-			is_notification_showed = true
-			Notifications.push(Language[Settings.Language].WARNINGS.NO_CHAPTERS)
-		end
-		local item = detailsSelector.getSelected()
-		if item ~= 0 then
-			y = shift - slider.Y + item * 80 + chaptersMaxHeightOffset
-			if y + 80 > 95 + chaptersMaxHeightOffset then
-				local SELECTED_RED = Color.new(255, 255, 255, 100 * M * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
-				local ks = math.ceil(2 * math.sin(Timer.getTime(GlobalTimer) / 100))
-				for i = ks, ks + 1 do
-					Graphics.fillEmptyRect(272 + i, 950 - i, y + i + 2, y + 75 - i + 1, Color.new(255, 0, 51))
-					Graphics.fillEmptyRect(272 + i, 950 - i, y + i + 2, y + 75 - i + 1, SELECTED_RED)
-				end
-				if selectedManga.ParserID ~= "IMPORTED" then
-					Graphics.drawImage(929 - ks, y + 5 + ks, ButtonsIcons.Square.e)
-				end
-			end
-		end
+	end
+	if listCount == 0 and not ParserManager.check(chaptersList) then
+		local message = FitText(FONT20, Language[Settings.Language].WARNINGS.NO_CHAPTERS, 620)
+		Font.print(FONT20, 608 - Font.getTextWidth(FONT20, message) / 2, 300 + shift, message, secondTextColor)
+	end
 		if #descriptionWordList > 0 and chaptersMaxHeightOffset > 0 then
 			local descriptionLinesCount = is_description_expanded and #descriptionWordList or math.min(2, #descriptionWordList)
 			if descriptionLinesCount ~= #descriptionWordList or descriptionLinesCount > 2 then
@@ -673,31 +633,42 @@ function Details.draw()
 				end
 			end
 		end
-		Graphics.fillRect(88, 960 - 88 - 88, 0, 90, backgroundColor)
-		local mangaNameTickerX = maxMangaNameOffset * math.min(math.max(0, Timer.getTime(mangaNameTickerTimer) - 1500), maxMangaNameTickerTimeMs) / maxMangaNameTickerTimeMs
-		Font.print(BONT30, 88 - mangaNameTickerX, 70 * M - 63, selectedManga.Name, textColor)
-		Font.print(FONT16, 88, 70 * M - 22, selectedManga.RawLink, secondTextColor)
-		Graphics.fillRect(0, 88, 0, 90, backgroundColor)
-		Graphics.drawImage(32, 90 * M - 50 - 12, BackIcon.e, COLOR_WHITE)
-		Graphics.fillRect(960 - 88 - 88, 960, 0, 90, backgroundColor)
-		if isVitaServerManga() then
-			Graphics.fillRect(960 - 88 * 3, 960 - 88 * 2, 0, 90, backgroundColor)
-			local label = (deleteArmed and Timer.getTime(deleteTimer) < 3000) and "Sure?" or "Delete"
-			Font.print(BONT16, 960 - 88 * 2.5 - Font.getTextWidth(BONT16, label) / 2, 34, label, Color.new(220, 70, 70, Alpha))
-		end
-		if sortIcons[Settings.ChapterSorting] then
-			Graphics.drawImage(960 - 88 - 32 - 24, 33, sortIcons[Settings.ChapterSorting].e, textColor)
-			Graphics.drawImage(960 - 88 - 32 - 24, 5 - (1 - M) * 32, ButtonsIcons.R.e)
-		end
-		if is_chapter_list_ready then
-			Graphics.drawImage(960 - 32 - 24, 33, menuIcon.e, textColor)
-			Graphics.drawImage(960 - 32 - 24 - 20, 5 - (1 - M) * 32, ButtonsIcons.Start.e)
-		end
-		Graphics.fillRect(955, 960, 90, 544, backgroundColor)
-		if status == "START" and #chaptersList > 5 then
-			local h = #chaptersList * 80 / 454
-			Graphics.fillRect(955, 960, 90 + (slider.Y + 20) / h, 90 + (slider.Y + 464) / h, COLOR_GRAY)
-		end
+	if chaptersMaxHeightOffset > 24 then
+		UI.roundBorder(270, 948, 95, 95 + chaptersMaxHeightOffset, 10, 1, Color.new(103, 137, 170, 55 * M))
+	end
+	-- The fixed header masks chapter rows and summary text while they scroll.
+	Graphics.fillRect(0, 960, 0, 90, Color.new(20, 43, 70, Alpha))
+	Graphics.fillRect(0, 960, 89, 90, Color.new(132, 188, 235, 45 * M))
+	UI.fillRoundRect(16, 72, 17, 73, 12, Color.new(255, 255, 255, 12 * M))
+	Graphics.drawImage(32, 33, BackIcon.e, textColor)
+	local titleRight = isVitaServerManga() and 682 or 770
+	Font.print(BONT30, 94, 13 + shift, FitText(BONT30, selectedManga.Name, titleRight - 94), textColor)
+	local subtitle = selectedManga.RawLink or ""
+	if subtitle == "" then subtitle = tostring(listCount) .. " chapters" end
+	Font.print(FONT16, 94, 56 + shift, FitText(FONT16, subtitle, titleRight - 94), secondTextColor)
+	if isVitaServerManga() then
+		UI.fillRoundRect(706, 774, 17, 73, 12, Color.new(119, 48, 65, Alpha))
+		local label = (deleteArmed and Timer.getTime(deleteTimer) < 3000) and "Sure?" or "Delete"
+		Font.print(BONT16, 740 - Font.getTextWidth(BONT16, label) / 2, 35, label, textColor)
+	end
+	UI.fillRoundRect(794, 862, 17, 73, 12, Color.new(255, 255, 255, 12 * M))
+	if sortIcons[Settings.ChapterSorting] then
+		Graphics.drawImage(816, 33, sortIcons[Settings.ChapterSorting].e, textColor)
+		Graphics.drawImage(799, 20, ButtonsIcons.R.e, secondTextColor)
+	end
+	if is_chapter_list_ready then
+		UI.fillRoundRect(882, 950, 17, 73, 12, Color.new(255, 255, 255, 12 * M))
+		Graphics.drawImage(904, 33, menuIcon.e, textColor)
+		Graphics.drawImage(887, 20, ButtonsIcons.Start.e, secondTextColor)
+	end
+	Graphics.fillRect(952, 960, 90, 544, backgroundColor)
+	local viewport = 449 - chaptersMaxHeightOffset
+	local content = listCount * 80
+	if viewport > 0 and content > viewport then
+		local thumb = math.max(28, viewport * viewport / content)
+		thumb = math.min(viewport, thumb)
+		local top = 95 + chaptersMaxHeightOffset + (viewport - thumb) * math.max(0, math.min(1, (slider.Y + 15) / (content - viewport)))
+		UI.roundRect(955, 959, top, top + thumb, secondTextColor)
 	end
 end
 

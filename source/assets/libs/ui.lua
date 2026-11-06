@@ -91,13 +91,14 @@ function UI.roundBorder(x1, x2, y1, y2, radius, thickness, color)
 end
 
 -- Shared focus treatment for cover tiles and catalog source cards.
-function UI.focusBorder(left, right, top, bottom, radius)
+function UI.focusBorder(left, right, top, bottom, radius, opacity)
+	opacity = opacity or 1
 	local pulse = (1 - math.cos(Timer.getTime(GlobalTimer) * math.pi / 900)) / 2
 	for spread = 3, 1, -1 do
-		UI.roundBorder(left - spread, right + spread, top - spread, bottom + spread, radius + spread, 1, Color.new(65, 166, 255, (22 + 36 * pulse) * (4 - spread) / 3))
+		UI.roundBorder(left - spread, right + spread, top - spread, bottom + spread, radius + spread, 1, Color.new(65, 166, 255, (22 + 36 * pulse) * (4 - spread) / 3 * opacity))
 	end
-	UI.roundBorder(left, right, top, bottom, radius, 2, Color.new(75, 174, 255, 165 + 90 * pulse))
-	UI.roundBorder(left + 2, right - 2, top + 2, bottom - 2, radius - 2, 1, Color.new(181, 232, 255, 65 + 105 * pulse))
+	UI.roundBorder(left, right, top, bottom, radius, 2, Color.new(75, 174, 255, (165 + 90 * pulse) * opacity))
+	UI.roundBorder(left + 2, right - 2, top + 2, bottom - 2, radius - 2, 1, Color.new(181, 232, 255, (65 + 105 * pulse) * opacity))
 end
 
 function UI.listCard(top, bottom, active)
