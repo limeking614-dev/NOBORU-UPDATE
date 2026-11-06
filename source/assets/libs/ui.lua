@@ -50,6 +50,15 @@ local function corner(radius)
 	return corners[radius]
 end
 
+-- Filled rounded surfaces can sit over a dimmed scene without erasing it.
+function UI.fillRoundRect(x1, x2, y1, y2, radius, color)
+	Graphics.fillRect(x1, x2, y1 + radius, y2 - radius, color)
+	for row, inset in ipairs(corner(radius)) do
+		Graphics.fillRect(x1 + inset, x2 - inset, y1 + row - 1, y1 + row, color)
+		Graphics.fillRect(x1 + inset, x2 - inset, y2 - row, y2 - row + 1, color)
+	end
+end
+
 -- Cover images remain unchanged; erase only the pixels outside rounded corners.
 function UI.roundCorners(x1, x2, y1, y2, radius, background)
 	for row, inset in ipairs(corner(radius)) do

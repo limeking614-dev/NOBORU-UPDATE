@@ -55,8 +55,7 @@ function Panel.draw()
 	end
 	Graphics.fillRect(0, 960, 521 + y, 524 + y, Color.new(0, 0, 0, 32))
 	Graphics.fillRect(0, 960, 522 + y, 524 + y, Color.new(0, 0, 0, 32))
-	local mode = Menu.getMode()
-	local styled = AppMode == MENU and (mode == "LIBRARY" or mode == "HISTORY" or mode == "IMPORT" or mode == "SETTINGS" or mode == "CATALOGS")
+	local styled = AppMode == MENU
 	Graphics.fillRect(0, 960, 524 + y, 544, styled and Color.new(13, 51, 88) or COLOR_PANEL)
 	local fontColor = styled and COLOR_WHITE or COLOR_FONT
 	local x = 20

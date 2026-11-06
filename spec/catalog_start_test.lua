@@ -72,10 +72,18 @@ Catalogs.update()
 assert(#calls == 1, 'first page must be queued asynchronously')
 finishList()
 assert(#calls == 2 and calls[2].mode == 'Popular' and calls[2].page == 1, 'opening must request page one without scrolling')
-local drawn
-DrawManga = function(_, _, manga) drawn = manga end
+local drawn, coverX, coverY
+DrawManga = function(x, y, manga) drawn, coverX, coverY = manga, x, y end
 Catalogs.draw()
 assert(drawn and drawn.ID == 'catalog-title', 'connected source must render its titles')
+assert(coverX == 301 and coverY == 199, 'source manga grid must share the library header and cover layout')
+local openedTitle
+Details.setManga = function(manga) openedTitle = manga end
+local coverTouch = { x = 213, y = 100 }
+Catalogs.input(0, 0, {}, coverTouch)
+Catalogs.input(0, 0, coverTouch, coverTouch)
+Catalogs.input(0, 0, coverTouch, {})
+assert(openedTitle == drawn, 'source cover taps must match the new grid layout')
 Catalogs.update()
 finishList()
 assert(#calls == 2, 'completed first page must not be requested every frame')
