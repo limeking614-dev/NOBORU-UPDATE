@@ -23,6 +23,7 @@ loadlib("selector")
 loadlib("console")
 loadlib("language")
 loadlib("themes")
+loadlib("ui")
 loadlib("webtoonlang")
 loadlib("loading")
 loadlib("adbypass")
@@ -191,6 +192,7 @@ end
 local fade = 1
 
 local function input()
+	UI.update()
 	oldPad, pad = pad, Controls.read()
 	oldTouch.x, oldTouch.y, oldTouch2.x, oldTouch2.y, touch.x, touch.y, touch2.x, touch2.y = touch.x, touch.y, touch2.x, touch2.y, Controls.readTouch()
 

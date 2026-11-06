@@ -22,12 +22,23 @@ local currentParser = nil
 local touchTimer = Timer.new()
 
 local status = "CATALOGS"
+local function gridTop()
+	return status == "LIBRARY" and 64 or 6
+end
+
+local function gridY(index)
+	return floor((index - 1) / 4) * (MANGA_HEIGHT + 6) - slider.Y + gridTop()
+end
+
 local keyboardMode = "NONE"
 local downloadBarValue = 0
 
 local downloadedImages = {}
 local page = 1
 local currentMangaList = {}
+local function gridLimit()
+	return max(0, ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 6) + gridTop() - 6 - (status == "LIBRARY" and 524 or 518))
+end
 local parsersList = {}
 
 local chaptersFolderSize
@@ -48,7 +59,7 @@ local mangaSelector =
 	-1,
 	1,
 	function()
-		return max(1, floor((slider.Y - 20) / (MANGA_HEIGHT + 12)) * 4 + 1)
+		return max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
 	end
 )
 
@@ -813,18 +824,18 @@ function Catalogs.input(oldpad, pad, oldtouch, touch)
 	elseif status == "IMPORT" then
 		importSelector:input(#Import.listDir(), oldpad, pad, touch.x)
 	end
-	if TOUCH_MODES.MODE == TOUCH_MODES.NONE and oldtouch.x and touch.x and touch.x > 240 then
+	if TOUCH_MODES.MODE == TOUCH_MODES.NONE and oldtouch.x and touch.x and touch.x > 205 and touch.y >= gridTop() and touch.y < 524 then
 		TOUCH_MODES.MODE = TOUCH_MODES.READ
 		slider.TouchY = touch.y
 	elseif TOUCH_MODES.MODE ~= TOUCH_MODES.NONE and not touch.x then
 		if oldtouch.x then
 			if TOUCH_MODES.MODE == TOUCH_MODES.READ then
 				if status == "MANGA" or status == "LIBRARY" or status == "HISTORY" then
-					local start = max(1, floor((slider.Y - 20) / (MANGA_HEIGHT + 6)) * 4 + 1)
+					local start = max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
 					for i = start, min(#currentMangaList, start + 11) do
-						local lx = ((i - 1) % 4 - 2) * (MANGA_WIDTH + 6) + 610
-						local uy = floor((i - 1) / 4) * (MANGA_HEIGHT + 6) - slider.Y + 6
-						if oldtouch.x > lx and oldtouch.x < lx + MANGA_WIDTH and oldtouch.y > uy and oldtouch.y < uy + MANGA_HEIGHT then
+						local lx = 580 + (((i - 1) % 4) - 2) * (MANGA_WIDTH + 6) + 3
+						local uy = gridY(i)
+						if oldtouch.x > lx and oldtouch.x < lx + MANGA_WIDTH and oldtouch.y >= gridTop() and oldtouch.y < 524 and oldtouch.y > uy and oldtouch.y < uy + MANGA_HEIGHT then
 							selectManga(i)
 							break
 						end
@@ -889,6 +900,9 @@ function Catalogs.input(oldpad, pad, oldtouch, touch)
 	end
 	if TOUCH_MODES.MODE == TOUCH_MODES.SLIDE and oldtouch.x and touch.x and touch.x > 205 then
 		slider.V = oldtouch.y - touch.y
+		if status == "LIBRARY" then
+			slider.V = slider.V * (1000 / 60) / UI.dt
+		end
 	end
 end
 
@@ -988,13 +1002,27 @@ function Catalogs.update()
 	if pcSync and not Threads.check(pcSync) then
 		finishPcSync()
 	end
-	if abs(slider.V) < 1 then
+	if status == "LIBRARY" then
+		local frames = UI.dt / (1000 / 60)
+		-- Integrate exponential drag so travel is independent of frame rate.
+		local decay = math.pow(1 / 1.12, frames)
+		slider.Y = slider.Y + slider.V * (1 - decay) / (1 - 1 / 1.12)
+		slider.V = slider.V * decay
+		if abs(slider.V) < 0.1 then slider.V = 0 end
+	elseif abs(slider.V) < 1 then
 		slider.V = 0
 	else
 		slider.Y = slider.Y + slider.V
 		slider.V = slider.V / 1.12
 	end
 	if status == "MANGA" or status == "LIBRARY" or status == "HISTORY" then
+		-- Opening a source (or changing its filters) must start page one even
+		-- when the empty grid is already clamped to its zero scroll limit.
+		if status == "MANGA" and page == 1 and currentParser and not ParserManager.check(currentMangaList) then
+			ParserManager.getMangaListAsync(CatalogModes.getMangaMode(), currentParser, page, currentMangaList, CatalogModes.getSearchData(), CatalogModes.getTagsData())
+			page = page + 1
+			manga_load_status = 1
+		end
 		UpdateMangas()
 		if ParserManager.check(currentMangaList) then
 			manga_load_status = 1
@@ -1004,7 +1032,12 @@ function Catalogs.update()
 		end
 		local item = mangaSelector:getSelected()
 		if item ~= 0 then
-			slider.Y = slider.Y + (math.floor((item - 1) / 4) * (MANGA_HEIGHT + 6) + MANGA_HEIGHT / 2 - 232 - slider.Y) / 8
+			local target = floor((item - 1) / 4) * (MANGA_HEIGHT + 6) + MANGA_HEIGHT / 2 - 232
+			if status == "LIBRARY" then
+				slider.Y = UI.approach(slider.Y, min(gridLimit(), max(0, target + gridTop() / 2)), 90)
+			else
+				slider.Y = slider.Y + (target - slider.Y) / 8
+			end
 			if status == "MANGA" and not currentMangaList.NoPages and currentParser and item > #currentMangaList - 4 then
 				if not ParserManager.check(currentMangaList) then
 					ParserManager.getMangaListAsync(CatalogModes.getMangaMode(), currentParser, page, currentMangaList, CatalogModes.getSearchData(), CatalogModes.getTagsData())
@@ -1015,8 +1048,8 @@ function Catalogs.update()
 		if slider.Y < 0 then
 			slider.Y = 0
 			slider.V = 0
-		elseif slider.Y > ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 6) - 512 - 6 then
-			slider.Y = max(0, ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 6) - 512 - 6)
+		elseif slider.Y > gridLimit() then
+			slider.Y = gridLimit()
 			slider.V = 0
 			if status == "MANGA" then
 				if not currentMangaList.NoPages and currentParser then
@@ -1170,31 +1203,40 @@ function Catalogs.draw()
 		local first = max(1, floor((slider.Y - 10) / 75))
 		local y = first * 75 - slider.Y
 		local last = min(#parsersList, first + 9)
+		local selected = parserSelector:getSelected()
 		for i = first, last do
 			local parser = parsersList[i]
-			if slider.ItemID == i then
-				Graphics.fillRect(215, 945, y - 75, y - 1, COLOR_SELECTED)
+			local background = COLOR_GRADIENT(COLOR_BACK, COLOR_SELECTED, 0.45)
+			if slider.ItemID == i or selected == i then
+				background = COLOR_SELECTED
 			end
-			Font.print(FONT26, 225, y - 70, parser.Name, COLOR_FONT)
+			Graphics.fillRect(215, 945, y - 70, y - 3, background)
+			UI.roundCorners(215, 945, y - 70, y - 3, 10, COLOR_BACK)
+			UI.roundBorder(215, 945, y - 70, y - 3, 10, 1, Color.new(128, 148, 168, 85))
+			local favourite = Settings.FavouriteParsers[parser.ID]
+			local badge = parser.isNew and "New" or (parser.isUpdated and "Updated" or "")
+			local nameWidth = 560 - (favourite and 24 or 0) - (parser.NSFW and 54 or 0) - (badge ~= "" and Font.getTextWidth(FONT16, badge) + 10 or 0)
+			local name = FitText(FONT26, parser.Name, nameWidth)
+			Font.print(FONT26, 229, y - 64, name, COLOR_FONT)
 			local lang_text = parser.Custom and "Your site" or (Language[Settings.Language].PARSERS[parser.Lang] or parser.Lang or "")
-			Font.print(FONT16, 935 - Font.getTextWidth(FONT16, lang_text), y - 15 - Font.getTextHeight(FONT16, lang_text), lang_text, COLOR_SUBFONT)
-			local width = Font.getTextWidth(FONT26, parser.Name)
-			if Settings.FavouriteParsers[parser.ID] then
-				Graphics.drawImage(230 + width, y - 70 + 8, MiniStarIcon.e, COLOR_ROYAL_BLUE)
-				width = width + 16 + 5
+			lang_text = FitText(FONT16, lang_text, 130)
+			Font.print(FONT16, 931 - Font.getTextWidth(FONT16, lang_text), y - 29, lang_text, COLOR_SUBFONT)
+			local width = Font.getTextWidth(FONT26, name)
+			if favourite then
+				Graphics.drawImage(235 + width, y - 56, MiniStarIcon.e, COLOR_ROYAL_BLUE)
+				width = width + 24
 			end
 			if parser.NSFW then
-				Font.print(FONT16, 230 + width, y - 70 + Font.getTextHeight(FONT26, parser.Name) - Font.getTextHeight(FONT16, "NSFW"), "NSFW", COLOR_ROYAL_BLUE)
-				width = width + Font.getTextWidth(FONT16, "NSFW") + 5
+				Font.print(FONT16, 235 + width, y - 56, "NSFW", COLOR_ROYAL_BLUE)
+				width = width + 54
 			end
-			if parser.isNew then
-				Font.print(FONT16, 230 + width, y - 70 + Font.getTextHeight(FONT26, parser.Name) - Font.getTextHeight(FONT16, "New"), "New", COLOR_CRIMSON)
-			elseif parser.isUpdated then
-				Font.print(FONT16, 230 + width, y - 70 + Font.getTextHeight(FONT26, parser.Name) - Font.getTextHeight(FONT16, "Updated"), "Updated", COLOR_CRIMSON)
+			if badge ~= "" then
+				Font.print(FONT16, 235 + width, y - 56, badge, COLOR_CRIMSON)
 			end
-			Font.print(FONT16, 935 - Font.getTextWidth(FONT16, "v" .. parser.Version), y - 65, "v" .. parser.Version, COLOR_SUBFONT)
-			local link_text = parser.Link .. "/"
-			Font.print(FONT16, 225, y - 23 - Font.getTextHeight(FONT16, link_text), link_text, COLOR_SUBFONT)
+			local version = FitText(FONT16, "v" .. tostring(parser.Version or ""), 130)
+			Font.print(FONT16, 931 - Font.getTextWidth(FONT16, version), y - 59, version, COLOR_SUBFONT)
+			local link_text = FitText(FONT16, (parser.Link or ""):gsub("/+$", ""), 550)
+			Font.print(FONT16, 229, y - 29, link_text, COLOR_SUBFONT)
 			y = y + 75
 		end
 		local elementsCount = #parsersList
@@ -1541,25 +1583,33 @@ function Catalogs.draw()
 			local start = max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
 			for i = start, min(#currentMangaList, start + 15) do
 				local x = 580 + (((i - 1) % 4) - 2) * (MANGA_WIDTH + 6) + 3
-				local y = -slider.Y + floor((i - 1) / 4) * (MANGA_HEIGHT + 6) + 6
+				local y = gridY(i)
 				DrawManga(x + MANGA_WIDTH / 2, y + MANGA_HEIGHT / 2, currentMangaList[i])
+				if status == "LIBRARY" then
+					UI.roundCorners(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, COLOR_BACK)
+					UI.roundBorder(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, 1, Color.new(128, 148, 168, 85))
+				end
 				if status == "LIBRARY" and currentMangaList[i].Counter then
 					local c = currentMangaList[i].Counter
 					if c > 0 then
-						Graphics.fillRect(x, x + Font.getTextWidth(BONT16, c) + 11, y, y + 24, Themes[Settings.Theme].COLOR_LABEL)
-						Font.print(BONT16, x + 5, y + 2, tostring(c), COLOR_WHITE)
+						UI.roundRect(x + 6, x + Font.getTextWidth(BONT16, c) + 22, y + 6, y + 30, Color.new(15, 89, 156, 240))
+						Font.print(BONT16, x + 14, y + 8, tostring(c), COLOR_WHITE)
 					end
 				end
 			end
 			local item = mangaSelector:getSelected()
 			if item ~= 0 then
 				local x = 580 + (((item - 1) % 4) - 2) * (MANGA_WIDTH + 6) + MANGA_WIDTH / 2 + 3
-				local y = MANGA_HEIGHT / 2 - slider.Y + floor((item - 1) / 4) * (MANGA_HEIGHT + 6) + 6
-				local wh = Color.new(255, 255, 255, 100 * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
-				local ks = math.ceil(4 * math.sin(Timer.getTime(GlobalTimer) / 100))
-				for i = ks + 1, ks + 3 do
-					Graphics.fillEmptyRect(x - MANGA_WIDTH / 2 + i, x + MANGA_WIDTH / 2 - i + 1, y - MANGA_HEIGHT / 2 + i, y + MANGA_HEIGHT / 2 - i + 1, Themes[Settings.Theme].COLOR_SELECTOR)
-					Graphics.fillEmptyRect(x - MANGA_WIDTH / 2 + i, x + MANGA_WIDTH / 2 - i + 1, y - MANGA_HEIGHT / 2 + i, y + MANGA_HEIGHT / 2 - i + 1, wh)
+				local y = MANGA_HEIGHT / 2 + gridY(item)
+				if status == "LIBRARY" then
+					UI.focusBorder(x - MANGA_WIDTH / 2, x + MANGA_WIDTH / 2, y - MANGA_HEIGHT / 2, y + MANGA_HEIGHT / 2, 10)
+				else
+					local wh = Color.new(255, 255, 255, 100 * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
+					local ks = math.ceil(4 * math.sin(Timer.getTime(GlobalTimer) / 100))
+					for i = ks + 1, ks + 3 do
+						Graphics.fillEmptyRect(x - MANGA_WIDTH / 2 + i, x + MANGA_WIDTH / 2 - i + 1, y - MANGA_HEIGHT / 2 + i, y + MANGA_HEIGHT / 2 - i + 1, Themes[Settings.Theme].COLOR_SELECTOR)
+						Graphics.fillEmptyRect(x - MANGA_WIDTH / 2 + i, x + MANGA_WIDTH / 2 - i + 1, y - MANGA_HEIGHT / 2 + i, y + MANGA_HEIGHT / 2 - i + 1, wh)
+					end
 				end
 			end
 			if #currentMangaList > 4 then
@@ -1593,24 +1643,59 @@ function Catalogs.draw()
 			Font.print(FONT16, 582 - math.floor(line.Width / 2), 272 - math.floor(height / 2) + dy, line.Text, Themes[Settings.Theme].COLOR_SUBFONT)
 			dy = dy + line.Height + 4
 		end
-		if smile then
+		if status == "LIBRARY" then
+			Graphics.drawImage(570, 192 - floor(height / 2), StarIcon.e, COLOR_ROYAL_BLUE)
+		elseif smile then
 			Font.print(FONT26, 582 - math.floor(Font.getTextWidth(FONT26, smile) / 2), 272 - math.floor(height / 2) + dy + 6, smile, Themes[Settings.Theme].COLOR_SUBFONT)
 		end
 	end
 	if item and item ~= 0 then
 		local y = item * 75 - slider.Y
-		local wh = Color.new(255, 255, 255, 100 * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
-		local ks = math.ceil(4 * math.sin(Timer.getTime(GlobalTimer) / 100))
-		for i = ks, ks + 1 do
-			Graphics.fillEmptyRect(218 + i, 942 - i + 1, y - i - 5 + itemHeight, y - 71 + i + 1, Themes[Settings.Theme].COLOR_SELECTOR)
-			Graphics.fillEmptyRect(218 + i, 942 - i + 1, y - i - 5 + itemHeight, y - 71 + i + 1, wh)
+		if status == "CATALOGS" then
+			UI.focusBorder(215, 945, y - 70, y - 3, 10)
+		else
+			local wh = Color.new(255, 255, 255, 100 * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
+			local ks = math.ceil(4 * math.sin(Timer.getTime(GlobalTimer) / 100))
+			for i = ks, ks + 1 do
+				Graphics.fillEmptyRect(218 + i, 942 - i + 1, y - i - 5 + itemHeight, y - 71 + i + 1, Themes[Settings.Theme].COLOR_SELECTOR)
+				Graphics.fillEmptyRect(218 + i, 942 - i + 1, y - i - 5 + itemHeight, y - 71 + i + 1, wh)
+			end
 		end
 	end
-	Graphics.fillRect(955, 960, 0, 544, COLOR_BACK)
-	if scrollHeight then
-		Graphics.fillRect(955, 960, slider.Y / scrollHeight, (slider.Y + 524) / scrollHeight, COLOR_FONT)
+	if status == "LIBRARY" then
+		-- Paint the fixed header after the covers to clip their scrolling edge.
+		Graphics.fillRect(205, 960, 0, 58, COLOR_BACK)
+		Graphics.fillRect(221, 945, 57, 58, Color.new(Color.getR(COLOR_FONT), Color.getG(COLOR_FONT), Color.getB(COLOR_FONT), 30))
+		Font.print(FONT26, 223, 15, Language[Settings.Language].APP.LIBRARY, COLOR_FONT)
+		local count = tostring(#currentMangaList)
+		local width = Font.getTextWidth(FONT20, count)
+		UI.roundRect(929 - width, 945, 15, 43, COLOR_SELECTED)
+		Font.print(FONT20, 937 - width, 18, count, COLOR_FONT)
+		Graphics.fillRect(952, 960, 58, 544, COLOR_BACK)
+		Graphics.fillRect(205, 960, 524, 544, COLOR_BACK)
+		local limit = gridLimit()
+		if limit > 0 then
+			local track = 460
+			local thumb = max(28, track * track / (limit + track))
+			local top = 64 + (track - thumb) * max(0, min(1, slider.Y / limit))
+			UI.roundRect(955, 959, top, top + thumb, COLOR_SUBFONT)
+		end
+	elseif status == "CATALOGS" then
+		Graphics.fillRect(952, 960, 0, 544, COLOR_BACK)
+		Graphics.fillRect(205, 960, 524, 544, COLOR_BACK)
+		local content = #parsersList * 75
+		if content > 504 then
+			local thumb = max(28, 504 * 504 / content)
+			local top = 10 + (504 - thumb) * max(0, min(1, (slider.Y + 10) / (content - 504)))
+			UI.roundRect(955, 959, top, top + thumb, COLOR_SUBFONT)
+		end
 	else
-		Graphics.fillRect(955, 960, 0, 524, COLOR_FONT)
+		Graphics.fillRect(955, 960, 0, 544, COLOR_BACK)
+		if scrollHeight then
+			Graphics.fillRect(955, 960, slider.Y / scrollHeight, (slider.Y + 524) / scrollHeight, COLOR_FONT)
+		else
+			Graphics.fillRect(955, 960, 0, 524, COLOR_FONT)
+		end
 	end
 end
 
@@ -1630,6 +1715,8 @@ function Catalogs.terminate()
 	currentMangaList = {}
 	page = 1
 	slider.Y = -100
+	slider.V = 0
+	TOUCH_MODES.MODE = TOUCH_MODES.NONE
 	mangaSelector:resetSelected()
 	parserSelector:resetSelected()
 	downloadSelector:resetSelected()
