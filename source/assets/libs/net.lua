@@ -332,16 +332,19 @@ function Threads.update()
 						end
 					end
 				elseif currentTask.Image.i < currentTask.Image.Parts then
-					currentTask.Image.i = currentTask.Image.i + 1
 					if currentTask.Table[currentTask.Index] == TRASH.Garbadge then
 						TRASH.Garbadge = Image:new(getAsyncResult())
 						TRASH.Type = "ImageLoadTable2"
+						uniques[currentTask.UniqueKey] = nil
+						currentTask = nil
 						return
 					end
-					currentTask.Table[currentTask.Index][currentTask.Image.i] = Image:new(getAsyncResult(), FILTER_LINEAR)
-					if not currentTask.Table[currentTask.Index][currentTask.Image.i] then
+					local part = Image:new(getAsyncResult(), FILTER_LINEAR)
+					if not part then
 						error("error with part function")
 					else
+						currentTask.Image.i = currentTask.Image.i + 1
+						currentTask.Table[currentTask.Index][currentTask.Image.i] = part
 						Console.write(string.format("Got %s image", currentTask.Image.i))
 					end
 				else
@@ -359,6 +362,7 @@ function Threads.update()
 					Console.write(string.format("Getting %s %sx%s Image", sliceHeight * currentTask.Image.i, currentTask.Image.RealWidth, Height))
 					Graphics.loadPartImageAsync(currentTask.Path, 0, sliceHeight * currentTask.Image.i, currentTask.Image.RealWidth, Height)
 				else
+					currentTask.Final = true
 					uniques[currentTask.UniqueKey] = nil
 					currentTask = nil
 				end
@@ -392,6 +396,21 @@ function Threads.update()
 		elseif currentTask ~= nil then
 			Console.error("NET: " .. err)
 			currentTask.Retry = currentTask.Retry - 1
+			if currentTask.Type == "ImageLoadTable" then
+				-- Other queued pages reuse the temporary file and async result. Restart
+				-- from our own file/download instead of resuming a stale slice operation.
+				local image = currentTask.Table[currentTask.Index]
+				if image then
+					for i = 1, image.Parts or 0 do
+						if image[i] then
+							image[i]:free()
+						end
+					end
+				end
+				currentTask.Table[currentTask.Index] = nil
+				currentTask.Image = nil
+				currentTask.Type = currentTask.Link and "ImageDownload" or "Image"
+			end
 			if currentTask.FallbackLink then
 				currentTask.Link = fixLink(currentTask.FallbackLink)
 				currentTask.Header1, currentTask.Header2, currentTask.Header3, currentTask.Header4 = currentTask.FallbackH1, currentTask.FallbackH2, currentTask.FallbackH3, currentTask.FallbackH4
