@@ -92,6 +92,9 @@ function Selector:new(dUp, dDown, dLeft, dRight, capFunction)
 	function p:setSelected(index)
 		itemSelected = math.max(0, math.floor(index))
 	end
+	function p:setSteps(up, down, left, right)
+		dUp, dDown, dLeft, dRight = up, down, left, right
+	end
 	function p:xaction(foo)
 		onCrossFunction = foo
 	end

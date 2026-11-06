@@ -84,6 +84,13 @@ Catalogs.input(0, 0, {}, coverTouch)
 Catalogs.input(0, 0, coverTouch, coverTouch)
 Catalogs.input(0, 0, coverTouch, {})
 assert(openedTitle == drawn, 'source cover taps must match the new grid layout')
+for _, mode in ipairs({'Comfortable grid', 'Cover-only', 'Compact grid'}) do
+	Settings.GridDisplay = mode
+	Catalogs.update()
+	Catalogs.draw()
+	local layout = Grid.layout()
+	assert(coverX == Grid.x(1) + layout.width / 2 and coverY == 64 + layout.height / 2, 'source grid must apply ' .. mode)
+end
 Catalogs.update()
 finishList()
 assert(#calls == 2, 'completed first page must not be requested every frame')

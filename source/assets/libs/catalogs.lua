@@ -31,7 +31,8 @@ local function gridTop()
 end
 
 local function gridY(index)
-	return floor((index - 1) / 4) * (MANGA_HEIGHT + 6) - slider.Y + gridTop()
+	local layout = Grid.layout()
+	return floor((index - 1) / layout.columns) * layout.stride - slider.Y + gridTop()
 end
 
 local keyboardMode = "NONE"
@@ -41,7 +42,8 @@ local downloadedImages = {}
 local page = 1
 local currentMangaList = {}
 local function gridLimit()
-	return max(0, ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 6) + gridTop() - 6 - 524)
+	local layout = Grid.layout()
+	return max(0, ceil(#currentMangaList / layout.columns) * layout.stride + gridTop() - layout.gap - 524)
 end
 local parsersList = {}
 
@@ -63,9 +65,21 @@ local mangaSelector =
 	-1,
 	1,
 	function()
-		return max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
+		return Grid.first(slider.Y)
 	end
 )
+
+local lastGridLayout = Grid.layout()
+local function syncGridLayout()
+	local layout = Grid.layout()
+	if layout ~= lastGridLayout then
+		slider.Y, slider.V = 0, 0
+		mangaSelector:resetSelected()
+		TOUCH_MODES.MODE = TOUCH_MODES.NONE
+		lastGridLayout = layout
+	end
+	mangaSelector:setSteps(-layout.columns, layout.columns, -1, 1)
+end
 
 local parserSelector =
 	Selector:new(
@@ -528,11 +542,12 @@ end
 
 local function UpdateMangas()
 	if slider.V == 0 and Timer.getTime(touchTimer) > 200 then
-		local start = max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
-		if #downloadedImages > 12 then
+		local start = Grid.first(slider.Y)
+		local capacity = Grid.capacity()
+		if #downloadedImages > capacity then
 			local newTable = {}
 			for _, i in ipairs(downloadedImages) do
-				if i < start or i > min(#currentMangaList, start + 11) then
+				if i < start or i > min(#currentMangaList, start + capacity - 1) then
 					freeMangaImage(currentMangaList[i])
 				else
 					newTable[#newTable + 1] = i
@@ -540,7 +555,7 @@ local function UpdateMangas()
 			end
 			downloadedImages = newTable
 		end
-		for i = start, min(#currentMangaList, start + 11) do
+		for i = start, min(#currentMangaList, start + capacity - 1) do
 			local manga = currentMangaList[i]
 			if not manga.ImageDownload then
 				loadMangaImage(manga)
@@ -716,6 +731,7 @@ pcSelector:xaction(selectPcSource)
 settingSelector:xaction(selectSetting)
 importSelector:xaction(selectImport)
 function Catalogs.input(oldpad, pad, oldtouch, touch)
+	if isGrid() then syncGridLayout() end
 	if status == "MANGA" then
 		if Controls.check(pad, SCE_CTRL_CIRCLE) and not Controls.check(oldpad, SCE_CTRL_CIRCLE) then
 			if fromPcSources then
@@ -835,11 +851,12 @@ function Catalogs.input(oldpad, pad, oldtouch, touch)
 		if oldtouch.x then
 			if TOUCH_MODES.MODE == TOUCH_MODES.READ then
 				if status == "MANGA" or status == "LIBRARY" or status == "HISTORY" then
-					local start = max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
-					for i = start, min(#currentMangaList, start + 11) do
-						local lx = 580 + (((i - 1) % 4) - 2) * (MANGA_WIDTH + 6) + 3
+					local layout = Grid.layout()
+					local start = Grid.first(slider.Y)
+					for i = start, min(#currentMangaList, start + Grid.capacity() - 1) do
+						local lx = Grid.x(i)
 						local uy = gridY(i)
-						if oldtouch.x > lx and oldtouch.x < lx + MANGA_WIDTH and oldtouch.y >= gridTop() and oldtouch.y < 524 and oldtouch.y > uy and oldtouch.y < uy + MANGA_HEIGHT then
+						if oldtouch.x > lx and oldtouch.x < lx + layout.width and oldtouch.y >= gridTop() and oldtouch.y < 524 and oldtouch.y > uy and oldtouch.y < uy + layout.itemHeight then
 							selectManga(i)
 							break
 						end
@@ -1003,6 +1020,7 @@ function GenPanels()
 end
 
 function Catalogs.update()
+	if isGrid() then syncGridLayout() end
 	if pcSync and not Threads.check(pcSync) then
 		finishPcSync()
 	end
@@ -1036,13 +1054,14 @@ function Catalogs.update()
 		end
 		local item = mangaSelector:getSelected()
 		if item ~= 0 then
-			local target = floor((item - 1) / 4) * (MANGA_HEIGHT + 6) + MANGA_HEIGHT / 2 - 232
+			local layout = Grid.layout()
+			local target = floor((item - 1) / layout.columns) * layout.stride + layout.height / 2 - 232
 			if isGrid() then
 				slider.Y = UI.approach(slider.Y, min(gridLimit(), max(0, target + gridTop() / 2)), 90)
 			else
 				slider.Y = slider.Y + (target - slider.Y) / 8
 			end
-			if status == "MANGA" and not currentMangaList.NoPages and currentParser and item > #currentMangaList - 4 then
+			if status == "MANGA" and not currentMangaList.NoPages and currentParser and item > #currentMangaList - layout.columns then
 				if not ParserManager.check(currentMangaList) then
 					ParserManager.getMangaListAsync(CatalogModes.getMangaMode(), currentParser, page, currentMangaList, CatalogModes.getSearchData(), CatalogModes.getTagsData())
 					page = page + 1
@@ -1426,6 +1445,10 @@ function Catalogs.draw()
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].THEME[Settings.Theme] or Settings.Theme, COLOR_SUBFONT)
 				elseif task == "LibrarySorting" then
 					Font.print(FONT16, 225, y - 44, Settings.LibrarySorting, COLOR_SUBFONT)
+				elseif task == "GridDisplay" then
+					Font.print(FONT16, 225, y - 44, Settings.GridDisplay, UI.color("SELECTOR"))
+				elseif task == "GridColumns" then
+					Font.print(FONT16, 225, y - 44, tostring(Settings.GridColumns), UI.color("SELECTOR"))
 				elseif task == "ChapterSorting" then
 					Font.print(FONT16, 225, y - 44, Settings.ChapterSorting, COLOR_SUBFONT)
 				elseif task == "ConnectionTime" then
@@ -1567,14 +1590,15 @@ function Catalogs.draw()
 		itemHeight = list[item] == "Translators" and 145 or 0
 	elseif status == "MANGA" or status == "LIBRARY" or status == "HISTORY" then
 		if #currentMangaList ~= 0 then
-			local start = max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
-			for i = start, min(#currentMangaList, start + 15) do
-				local x = 580 + (((i - 1) % 4) - 2) * (MANGA_WIDTH + 6) + 3
+			local layout = Grid.layout()
+			local start = Grid.first(slider.Y)
+			for i = start, min(#currentMangaList, start + Grid.capacity() - 1) do
+				local x = Grid.x(i)
 				local y = gridY(i)
-				DrawManga(x + MANGA_WIDTH / 2, y + MANGA_HEIGHT / 2, currentMangaList[i])
-				UI.roundCorners(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, COLOR_BACK)
-				UI.roundBorder(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, 1, UI.color("BORDER"))
-				if status == "LIBRARY" and currentMangaList[i].Counter then
+				DrawManga(x + layout.width / 2, y + layout.height / 2, currentMangaList[i], layout.width, layout.height, layout.coverOnly, layout.titlesBelow)
+				UI.roundCorners(x, x + layout.width, y, y + layout.height, 10, COLOR_BACK)
+				UI.roundBorder(x, x + layout.width, y, y + layout.height, 10, 1, UI.color("BORDER"))
+				if status == "LIBRARY" and not layout.coverOnly and currentMangaList[i].Counter then
 					local c = currentMangaList[i].Counter
 					if c > 0 then
 						UI.roundRect(x + 6, x + Font.getTextWidth(BONT16, c) + 22, y + 6, y + 30, UI.color("PRIMARY", 0.94))
@@ -1584,12 +1608,8 @@ function Catalogs.draw()
 			end
 			local item = mangaSelector:getSelected()
 			if item ~= 0 then
-				local x = 580 + (((item - 1) % 4) - 2) * (MANGA_WIDTH + 6) + MANGA_WIDTH / 2 + 3
-				local y = MANGA_HEIGHT / 2 + gridY(item)
-				UI.focusBorder(x - MANGA_WIDTH / 2, x + MANGA_WIDTH / 2, y - MANGA_HEIGHT / 2, y + MANGA_HEIGHT / 2, 10)
-			end
-			if #currentMangaList > 4 then
-				scrollHeight = ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 14) / 524
+				local x, y = Grid.x(item), gridY(item)
+				UI.focusBorder(x, x + layout.width, y, y + layout.height, 10)
 			end
 		else
 			if status == "LIBRARY" then

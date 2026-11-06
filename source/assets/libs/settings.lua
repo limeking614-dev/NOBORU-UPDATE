@@ -1,6 +1,8 @@
 Settings = {
 	Language = "Default",
 	Theme = "Light",
+	GridDisplay = "Compact grid",
+	GridColumns = 4,
 	Version = 0.911,
 	NSFW = false,
 	Orientation = "Horizontal",
@@ -160,6 +162,8 @@ end
 local settingsListTree = {
 	"Language",
 	"ChangeUI",
+	"GridDisplay",
+	"GridColumns",
 	"Library",
 	"Catalogs",
 	"Reader",
@@ -313,6 +317,8 @@ function settings.load()
 				setSetting(new, "HideInOffline", { true, false })
 				setSetting(new, "DoubleTapReader", { true, false })
 				setSetting(new, "Theme", Themes)
+				setSetting(new, "GridDisplay", { "Compact grid", "Comfortable grid", "Cover-only" })
+				setSetting(new, "GridColumns", { 3, 4, 5 })
 				setSetting(new, "ParserLanguage", GetParserLanguages())
 				setSetting(new, "LibrarySorting", { "Date added", "A-Z", "Z-A" })
 				setSetting(new, "ChapterSorting", { "1->N", "N->1" })
@@ -580,6 +586,12 @@ SettingsFunctions = {
 	ChangeUI = function()
 		settings.Theme = table.next(settings.Theme, GetThemes())
 		setTheme(settings.Theme)
+	end,
+	GridDisplay = function()
+		settings.GridDisplay = table.next(settings.GridDisplay, { "Compact grid", "Comfortable grid", "Cover-only" })
+	end,
+	GridColumns = function()
+		settings.GridColumns = table.next(settings.GridColumns, { 3, 4, 5 })
 	end,
 	ShowNSFW = function()
 		ChangeNSFW()

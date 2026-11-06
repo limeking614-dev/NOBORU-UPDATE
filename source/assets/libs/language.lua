@@ -3574,3 +3574,10 @@ end
 function GetLanguages()
 	return langs
 end
+
+for _, language in pairs(Language) do
+	language.SETTINGS.GridDisplay = "Display mode"
+	language.SETTINGS_DESCRIPTION.GridDisplay = "Cover layout for Library, History and manga catalogs"
+	language.SETTINGS.GridColumns = "Grid columns"
+	language.SETTINGS_DESCRIPTION.GridColumns = "3, 4 or 5 covers per row, independent of display mode"
+end

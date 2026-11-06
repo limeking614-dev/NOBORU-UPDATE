@@ -92,6 +92,7 @@ assert(UI.dt == 50, 'resume delta must be bounded')
 UI.dt = 1000 / 60
 
 dofile('source/assets/libs/selector.lua')
+dofile('source/assets/libs/grid.lua')
 dofile('source/assets/libs/catalogs.lua')
 for i = 1, 12 do library[i] = { ID = i, Name = 'Manga ' .. i, ImageDownload = true, Counter = i } end
 Catalogs.setStatus('LIBRARY')
