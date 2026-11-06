@@ -1615,14 +1615,14 @@ function Reader.draw()
 				Counter = (allPages.Count - allPages.Page + 1) .. "/" .. allPages.Count
 			end
 			local Width = Font.getTextWidth(FONT16, Counter) + 20
-			Graphics.fillRect(960 - Width, 960, counterShift, counterShift + Font.getTextHeight(FONT16, Counter) + 4, Color.new(0, 0, 0, 128))
-			Font.print(FONT16, 970 - Width, counterShift, Counter, COLOR_WHITE)
+			Graphics.fillRect(960 - Width, 960, counterShift, counterShift + Font.getTextHeight(FONT16, Counter) + 4, UI.color("SURFACE", 0.92))
+			Font.print(FONT16, 970 - Width, counterShift, Counter, UI.color("FONT"))
 		end
 	end
 	if MenuFade > 0 then
-		local BACK_COLOR = Color.new(0, 0, 0, 255 * MenuFade)
-		local GRAY_COLOR = Color.new(128, 128, 128, 255 * MenuFade)
-		local BLUE_COLOR = CloneColorWithNewAlpha(COLOR_ROYAL_BLUE, 255 * MenuFade)
+		local BACK_COLOR = UI.color("SURFACE", MenuFade)
+		local GRAY_COLOR = UI.color("SUBFONT", MenuFade)
+		local BLUE_COLOR = UI.color("SELECTOR", MenuFade)
 		Graphics.fillRect(88, 960 - 88 - 32 - 24 - 32, 0, 80 * MenuFade, BACK_COLOR)
 		Graphics.fillRect(0, 960, 544 - 80 * MenuFade, 544, BACK_COLOR)
 		if currentState == STATE_READING then
@@ -1640,8 +1640,8 @@ function Reader.draw()
 				Graphics.drawImage(200 + point - 6, 544 - 80 * MenuFade + 40 - 6, CircleIcon.e, BLUE_COLOR)
 				current_page = (allPages.Count - allPages.Page + 1)
 				current_page = math.max(1, math.min(current_page, allPages.Count))
-				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, allPages.Count), 544 - 80 * MenuFade + 23, allPages.Count, COLOR_WHITE)
-				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, current_page, COLOR_WHITE)
+				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, allPages.Count), 544 - 80 * MenuFade + 23, allPages.Count, UI.color("FONT", MenuFade))
+				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, current_page, UI.color("FONT", MenuFade))
 			elseif orientation == "Vertical" and is_down then
 				if allPages.Count == 1 then
 					point = 560
@@ -1651,25 +1651,25 @@ function Reader.draw()
 				Graphics.fillRect(200, 760, 544 - 80 * MenuFade + 39, 544 - 80 * MenuFade + 41, BLUE_COLOR)
 				Graphics.fillRect(200, 200 + point, 544 - 80 * MenuFade + 39, 544 - 80 * MenuFade + 41, GRAY_COLOR)
 				Graphics.drawImage(200 + point - 6, 544 - 80 * MenuFade + 40 - 6, CircleIcon.e, BLUE_COLOR)
-				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, allPages.Count), 544 - 80 * MenuFade + 23, allPages.Count, COLOR_WHITE)
-				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, current_page, COLOR_WHITE)
+				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, allPages.Count), 544 - 80 * MenuFade + 23, allPages.Count, UI.color("FONT", MenuFade))
+				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, current_page, UI.color("FONT", MenuFade))
 			else
 				Graphics.fillRect(200, 760, 544 - 80 * MenuFade + 39, 544 - 80 * MenuFade + 41, GRAY_COLOR)
 				Graphics.fillRect(200, 200 + point, 544 - 80 * MenuFade + 39, 544 - 80 * MenuFade + 41, BLUE_COLOR)
 				Graphics.drawImage(200 + point - 6, 544 - 80 * MenuFade + 40 - 6, CircleIcon.e, BLUE_COLOR)
-				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, current_page), 544 - 80 * MenuFade + 23, current_page, COLOR_WHITE)
-				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, allPages.Count, COLOR_WHITE)
+				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, current_page), 544 - 80 * MenuFade + 23, current_page, UI.color("FONT", MenuFade))
+				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, allPages.Count, UI.color("FONT", MenuFade))
 			end
 		end
 		if currentChapterNumber > 1 and not (orientation == "Vertical" and is_down or readDirection == "LEFT") or currentChapterNumber < #Chapters and (orientation == "Vertical" and is_down or readDirection == "LEFT") then
-			Graphics.drawImage(32, 544 - 80 * MenuFade + 40 - 12, leftArrowIcon.e, COLOR_WHITE)
+			Graphics.drawImage(32, 544 - 80 * MenuFade + 40 - 12, leftArrowIcon.e, UI.color("FONT", MenuFade))
 		else
-			Graphics.drawImage(32, 544 - 80 * MenuFade + 40 - 12, leftArrowIcon.e, COLOR_GRAY)
+			Graphics.drawImage(32, 544 - 80 * MenuFade + 40 - 12, leftArrowIcon.e, UI.color("SUBFONT", MenuFade))
 		end
 		if currentChapterNumber < #Chapters and not (orientation == "Vertical" and is_down or readDirection == "LEFT") or currentChapterNumber > 1 and (orientation == "Vertical" and is_down or readDirection == "LEFT") then
-			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, COLOR_WHITE)
+			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, UI.color("FONT", MenuFade))
 		else
-			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, COLOR_GRAY)
+			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, UI.color("SUBFONT", MenuFade))
 		end
 		if Chapters[currentChapterNumber] then
 			local manga_name = Chapters[currentChapterNumber].Manga.Name
@@ -1680,17 +1680,17 @@ function Reader.draw()
 			local ms_ch = 50 * string.len(chapter_name)
 			local t = math.min(math.max(0, Timer.getTime(mangaNameTickerTimer) - 1500), ms)
 			local t_ch = math.min(math.max(0, Timer.getTime(chapterNameTickerTimer) - 1500), ms_ch)
-			Font.print(BONT30, 88 - dif * t / ms, 80 * MenuFade - 73, manga_name, COLOR_WHITE)
-			Font.print(FONT16, 88 - dif_ch * t_ch / ms_ch, 80 * MenuFade - 32, chapter_name, COLOR_WHITE)
+			Font.print(BONT30, 88 - dif * t / ms, 80 * MenuFade - 73, manga_name, UI.color("FONT", MenuFade))
+			Font.print(FONT16, 88 - dif_ch * t_ch / ms_ch, 80 * MenuFade - 32, chapter_name, UI.color("FONT", MenuFade))
 			Graphics.fillRect(0, 88, 0, 80 * MenuFade, BACK_COLOR)
-			Graphics.drawImage(32, 80 * MenuFade - 40 - 12, BackIcon.e, COLOR_WHITE)
+			Graphics.drawImage(32, 80 * MenuFade - 40 - 12, BackIcon.e, UI.color("FONT", MenuFade))
 			Graphics.fillRect(960 - 88 - 32 - 24 - 32, 960, 0, 80 * MenuFade, BACK_COLOR)
 			if currentState == STATE_READING then
-				Graphics.drawImage(960 - 32 - 24 - 32 - 32 - 24, 80 * MenuFade - 40 - 12, RefreshIcon.e, COLOR_WHITE)
+				Graphics.drawImage(960 - 32 - 24 - 32 - 32 - 24, 80 * MenuFade - 40 - 12, RefreshIcon.e, UI.color("FONT", MenuFade))
 				if allPages[allPages.Page] and (allPages[allPages.Page].Link or Chapters[currentChapterNumber].Manga.ParserID == "IMPORTED" or allPages[allPages.Page].Path) then
-					Graphics.drawImage(960 - 32 - 24, 80 * MenuFade - 40 - 12, OptionsIcon.e, COLOR_WHITE)
+					Graphics.drawImage(960 - 32 - 24, 80 * MenuFade - 40 - 12, OptionsIcon.e, UI.color("FONT", MenuFade))
 				else
-					Graphics.drawImage(960 - 32 - 24, 80 * MenuFade - 40 - 12, OptionsIcon.e, COLOR_GRAY)
+					Graphics.drawImage(960 - 32 - 24, 80 * MenuFade - 40 - 12, OptionsIcon.e, UI.color("SUBFONT", MenuFade))
 				end
 			end
 			if Timer.getTime(mangaNameTickerTimer) > 3500 + ms then
@@ -1708,9 +1708,9 @@ function Reader.draw()
 			local shift = 80 * (1 - MenuFade)
 			for i = ks, ks + 1 do
 				if CursorPoint.y > 272 then
-					Graphics.fillEmptyRect(CursorPoint.x - 20 - i, CursorPoint.x + 20 + i + 2, CursorPoint.y - 20 - i + shift, CursorPoint.y + 20 + i + 2 + shift, Color.new(255, 0, 51, 255 * CursorFade))
+					Graphics.fillEmptyRect(CursorPoint.x - 20 - i, CursorPoint.x + 20 + i + 2, CursorPoint.y - 20 - i + shift, CursorPoint.y + 20 + i + 2 + shift, UI.color("SELECTOR", CursorFade))
 				else
-					Graphics.fillEmptyRect(CursorPoint.x - 20 - i, CursorPoint.x + 20 + i + 2, CursorPoint.y - 20 - i - shift, CursorPoint.y + 20 + i + 2 - shift, Color.new(255, 0, 51, 255 * CursorFade))
+					Graphics.fillEmptyRect(CursorPoint.x - 20 - i, CursorPoint.x + 20 + i + 2, CursorPoint.y - 20 - i - shift, CursorPoint.y + 20 + i + 2 - shift, UI.color("SELECTOR", CursorFade))
 				end
 			end
 		end

@@ -44,8 +44,8 @@ end
 
 function ConnectMessage.draw()
 	if str and yOffset < 544 then
-		Graphics.fillRect(60, 900, yOffset, yOffset + Font.getTextHeight(FONT20, str) + 27, Color.new(0, 0, 0, 220))
-		Font.print(FONT20, 80, yOffset + 10, str, COLOR_WHITE)
+		Graphics.fillRect(60, 900, yOffset, yOffset + Font.getTextHeight(FONT20, str) + 27, UI.color("SURFACE"))
+		Font.print(FONT20, 80, yOffset + 10, str, UI.color("FONT"))
 	end
 end
 

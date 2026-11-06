@@ -1221,15 +1221,15 @@ function Catalogs.draw()
 			Font.print(FONT16, 931 - Font.getTextWidth(FONT16, lang_text), y - 29, lang_text, COLOR_SUBFONT)
 			local width = Font.getTextWidth(FONT26, name)
 			if favourite then
-				Graphics.drawImage(235 + width, y - 56, MiniStarIcon.e, COLOR_ROYAL_BLUE)
+				Graphics.drawImage(235 + width, y - 56, MiniStarIcon.e, UI.color("SELECTOR"))
 				width = width + 24
 			end
 			if parser.NSFW then
-				Font.print(FONT16, 235 + width, y - 56, "NSFW", COLOR_ROYAL_BLUE)
+				Font.print(FONT16, 235 + width, y - 56, "NSFW", UI.color("SELECTOR"))
 				width = width + 54
 			end
 			if badge ~= "" then
-				Font.print(FONT16, 235 + width, y - 56, badge, COLOR_CRIMSON)
+				Font.print(FONT16, 235 + width, y - 56, badge, UI.color("DANGER"))
 			end
 			local version = FitText(FONT16, "v" .. tostring(parser.Version or ""), 130)
 			Font.print(FONT16, 931 - Font.getTextWidth(FONT16, version), y - 59, version, COLOR_SUBFONT)
@@ -1276,7 +1276,7 @@ function Catalogs.draw()
 			if object.active then
 				Font.print(FONT26, 229, y - 64, FitText(FONT26, object.name, 610), COLOR_FONT)
 			elseif object.directory then
-				Font.print(FONT26, 229, y - 64, FitText(FONT26, Language[Settings.Language].IMPORT.EXTERNAL_MEMORY, 610), COLOR_ROYAL_BLUE)
+				Font.print(FONT26, 229, y - 64, FitText(FONT26, Language[Settings.Language].IMPORT.EXTERNAL_MEMORY, 610), UI.color("SELECTOR"))
 			else
 				Font.print(FONT26, 229, y - 64, FitText(FONT26, object.name, 610), COLOR_SUBFONT)
 			end
@@ -1306,7 +1306,7 @@ function Catalogs.draw()
 				Font.print(FONT20, 229, y - 65, FitText(FONT20, task.MangaName, 690), COLOR_FONT)
 				Font.print(FONT16, 229, y - 42, FitText(FONT16, task.ChapterName, 690), COLOR_SUBFONT)
 				if task.Saved then
-					Font.print(FONT16, 229, y - 23, "Downloaded", COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 229, y - 23, "Downloaded", UI.color("SELECTOR"))
 				elseif pageCount > 0 then
 					local textCounter = math.ceil(page) .. "/" .. pageCount
 					local w = Font.getTextWidth(FONT16, textCounter)
@@ -1314,9 +1314,9 @@ function Catalogs.draw()
 					local left = min(915, 241 + w)
 					UI.roundRect(left, 931, y - 17, y - 11, COLOR_SELECTED)
 					if downloadBarValue > 0 then
-						UI.roundRect(left, left + (931 - left) * downloadBarValue, y - 17, y - 11, COLOR_ROYAL_BLUE)
+						UI.roundRect(left, left + (931 - left) * downloadBarValue, y - 17, y - 11, UI.color("SELECTOR"))
 					end
-					Font.print(FONT16, 229, y - 23, textCounter, COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 229, y - 23, textCounter, UI.color("SELECTOR"))
 				else
 					Font.print(FONT16, 229, y - 23, i == 1 and "Preparing download…" or "Queued", COLOR_SUBFONT)
 				end
@@ -1342,7 +1342,7 @@ function Catalogs.draw()
 			if type(task) == "table" then
 				if Settings.getTab() == "DonatorsList" then
 					if i == 1 then
-						Font.print(FONT26, (215 + 945) / 2 - Font.getTextWidth(FONT26, task.name) / 2, y - 45 - Font.getTextHeight(FONT26, task.name) / 2, task.name, COLOR_CRIMSON)
+						Font.print(FONT26, (215 + 945) / 2 - Font.getTextWidth(FONT26, task.name) / 2, y - 45 - Font.getTextHeight(FONT26, task.name) / 2, task.name, UI.color("DANGER"))
 					else
 						Font.print(FONT26, (215 + 945) / 2 - Font.getTextWidth(FONT26, task.name) / 2, y - 45 - Font.getTextHeight(FONT26, task.name) / 2, task.name, COLOR_FONT)
 					end
@@ -1356,7 +1356,7 @@ function Catalogs.draw()
 				if task == "DonatorsList" then
 					Font.print(FONT20, 225, y - 70, Language[Settings.Language].SETTINGS[task] or task, Color.new(136, 0, 255))
 					if Language[Settings.Language].SETTINGS_DESCRIPTION[task] then
-						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS_DESCRIPTION[task], COLOR_ROYAL_BLUE)
+						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS_DESCRIPTION[task], UI.color("SELECTOR"))
 					end
 				else
 					Font.print(FONT20, 225, y - 70, FitText(FONT20, Language[Settings.Language].SETTINGS[task] or task, 710), COLOR_FONT)
@@ -1398,7 +1398,7 @@ function Catalogs.draw()
 					end
 					Font.print(FONT16, 225, y - 44, BytesToStr(chaptersFolderSize), COLOR_SUBFONT)
 					if sure_clear_chapters > 0 then
-						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ReaderMode" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].READER[Settings.ReaderMode] or Settings.ReaderMode, COLOR_SUBFONT)
@@ -1407,21 +1407,21 @@ function Catalogs.draw()
 				elseif task == "PreferredCatalogLanguage" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].PARSERS[Settings.ParserLanguage] or Settings.ParserLanguage or "error_type", COLOR_SUBFONT)
 				elseif task == "ShowNSFW" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].NSFW[Settings.NSFW], Settings.NSFW and COLOR_CRIMSON or COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].NSFW[Settings.NSFW], Settings.NSFW and UI.color("DANGER") or UI.color("SELECTOR"))
 				elseif task == "HideInOffline" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.HideInOffline], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.HideInOffline], UI.color("SELECTOR"))
 				elseif task == "SkipFontLoading" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SkipFontLoad], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SkipFontLoad], UI.color("SELECTOR"))
 				elseif task == "ZoomReader" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].READER[Settings.ZoomReader], COLOR_SUBFONT)
 				elseif task == "DoubleTapReader" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.DoubleTapReader], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.DoubleTapReader], UI.color("SELECTOR"))
 				elseif task == "RefreshLibAtStart" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.RefreshLibAtStart], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.RefreshLibAtStart], UI.color("SELECTOR"))
 				elseif task == "UISoundDirections" or task == "UISoundCross" or task == "UISoundCircle" or task == "UISoundSquare" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings[task] ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings[task] ~= false], UI.color("SELECTOR"))
 				elseif task == "SilentDownloads" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SilentDownloads], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SilentDownloads], UI.color("SELECTOR"))
 				elseif task == "ChangeUI" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].THEME[Settings.Theme] or Settings.Theme, COLOR_SUBFONT)
 				elseif task == "LibrarySorting" then
@@ -1429,38 +1429,38 @@ function Catalogs.draw()
 				elseif task == "ChapterSorting" then
 					Font.print(FONT16, 225, y - 44, Settings.ChapterSorting, COLOR_SUBFONT)
 				elseif task == "ConnectionTime" then
-					Font.print(FONT16, 225, y - 44, Settings.ConnectionTime, COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Settings.ConnectionTime, UI.color("SELECTOR"))
 				elseif task == "WebpConvert" then
-					Font.print(FONT16, 225, y - 44, string.upper(Settings.WebpConvert), COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, string.upper(Settings.WebpConvert), UI.color("SELECTOR"))
 				elseif task == "FastImages" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.FastImages ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.FastImages ~= false], UI.color("SELECTOR"))
 				elseif task == "VitaSurfBridge" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.VitaSurfBridge ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.VitaSurfBridge ~= false], UI.color("SELECTOR"))
 				elseif task == "SiteProfiles" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SiteProfiles ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SiteProfiles ~= false], UI.color("SELECTOR"))
 				elseif task == "ReaderClock" then
 					local clockNames = { off = "OFF", time = "TIME", date = "DATE", both = "TIME + DATE" }
-					Font.print(FONT16, 225, y - 44, clockNames[Settings.ReaderClock or "off"] or "OFF", COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, clockNames[Settings.ReaderClock or "off"] or "OFF", UI.color("SELECTOR"))
 				elseif task == "ReaderClockPos" then
-					Font.print(FONT16, 225, y - 44, Settings.ReaderClockPos == "right" and "TOP RIGHT" or "TOP LEFT", COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Settings.ReaderClockPos == "right" and "TOP RIGHT" or "TOP LEFT", UI.color("SELECTOR"))
 				elseif task == "ReaderClock24h" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.ReaderClock24h == true], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.ReaderClock24h == true], UI.color("SELECTOR"))
 				elseif task == "CFCheck" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.CFCheck ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.CFCheck ~= false], UI.color("SELECTOR"))
 				elseif task == "CFBridge" then
-					Font.print(FONT16, 225, y - 44, string.upper(Settings.CFBridge or "auto"), COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, string.upper(Settings.CFBridge or "auto"), UI.color("SELECTOR"))
 				elseif task == "UseProxy" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.UseProxy], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.UseProxy], UI.color("SELECTOR"))
 				elseif task == "ProxyIP" then
 					Font.print(FONT16, 225, y - 44, Settings.ProxyIP, COLOR_SUBFONT)
 				elseif task == "ProxyPort" then
 					Font.print(FONT16, 225, y - 44, Settings.ProxyPort, COLOR_SUBFONT)
 				elseif task == "UseProxyAuth" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.UseProxyAuth], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.UseProxyAuth], UI.color("SELECTOR"))
 				elseif task == "SkipCacheChapterChecking" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SkipCacheChapterChecking], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SkipCacheChapterChecking], UI.color("SELECTOR"))
 				elseif task == "PressEdgesToChangePage" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.PressEdgesToChangePage], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.PressEdgesToChangePage], UI.color("SELECTOR"))
 				elseif task == "ProxyAuth" then
 					Font.print(FONT16, 225, y - 44, Settings.ProxyAuth, COLOR_SUBFONT)
 				elseif task == "ChapterSorting" then
@@ -1468,25 +1468,25 @@ function Catalogs.draw()
 				elseif task == "LeftStickDeadZone" then
 					local x = 0
 					for n = 1, #DeadZoneValues do
-						Font.print(FONT16, 225 + x, y - 44, DeadZoneValues[n], DeadZoneValues[n] == Settings.LeftStickDeadZone and COLOR_CRIMSON or COLOR_SUBFONT)
+						Font.print(FONT16, 225 + x, y - 44, DeadZoneValues[n], DeadZoneValues[n] == Settings.LeftStickDeadZone and UI.color("DANGER") or COLOR_SUBFONT)
 						x = x + Font.getTextWidth(FONT16, DeadZoneValues[n]) + 5
 					end
 				elseif task == "LeftStickSensitivity" then
 					local x = 0
 					for n = 1, #SensitivityValues do
-						Font.print(FONT16, 225 + x, y - 44, SensitivityValues[n], SensitivityValues[n] == Settings.LeftStickSensitivity and COLOR_CRIMSON or COLOR_SUBFONT)
+						Font.print(FONT16, 225 + x, y - 44, SensitivityValues[n], SensitivityValues[n] == Settings.LeftStickSensitivity and UI.color("DANGER") or COLOR_SUBFONT)
 						x = x + Font.getTextWidth(FONT16, SensitivityValues[n]) + 5
 					end
 				elseif task == "RightStickDeadZone" then
 					local x = 0
 					for n = 1, #DeadZoneValues do
-						Font.print(FONT16, 225 + x, y - 44, DeadZoneValues[n], DeadZoneValues[n] == Settings.RightStickDeadZone and COLOR_CRIMSON or COLOR_SUBFONT)
+						Font.print(FONT16, 225 + x, y - 44, DeadZoneValues[n], DeadZoneValues[n] == Settings.RightStickDeadZone and UI.color("DANGER") or COLOR_SUBFONT)
 						x = x + Font.getTextWidth(FONT16, DeadZoneValues[n]) + 5
 					end
 				elseif task == "RightStickSensitivity" then
 					local x = 0
 					for n = 1, #SensitivityValues do
-						Font.print(FONT16, 225 + x, y - 44, SensitivityValues[n], SensitivityValues[n] == Settings.RightStickSensitivity and COLOR_CRIMSON or COLOR_SUBFONT)
+						Font.print(FONT16, 225 + x, y - 44, SensitivityValues[n], SensitivityValues[n] == Settings.RightStickSensitivity and UI.color("DANGER") or COLOR_SUBFONT)
 						x = x + Font.getTextWidth(FONT16, SensitivityValues[n]) + 5
 					end
 				elseif task == "ChangingPageButtons" then
@@ -1502,19 +1502,19 @@ function Catalogs.draw()
 								return " " .. (LanguageNames[Settings.Language][a] or a) .. " "
 							end
 						),
-						COLOR_ROYAL_BLUE
+						UI.color("SELECTOR")
 					)
 				elseif task == "DeleteAddedSources" then
 					if sure_delete_sources > 0 then
-						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ClearLibrary" then
 					if sure_clear_library > 0 then
-						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ClearCache" then
 					if sure_clear_cache > 0 then
-						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ClearAllCache" then
 					if cacheFolderSize == nil then
@@ -1534,11 +1534,11 @@ function Catalogs.draw()
 					end
 					Font.print(FONT16, 225, y - 44, BytesToStr(cacheFolderSize), COLOR_SUBFONT)
 					if sure_clear_all_cache > 0 then
-						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ShowAuthor" then
 					Font.print(FONT16, 225, y - 44, "Claude AI (assistant)", COLOR_SUBFONT)
-					Font.print(FONT16, 225, y - 24, "Fork of Creckeryop/NOBORU", COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 24, "Fork of Creckeryop/NOBORU", UI.color("SELECTOR"))
 				elseif task == "SupportDev" then
 					Font.print(FONT16, 225, y - 44, "github.com/Creckeryop/NOBORU", COLOR_SUBFONT)
 				elseif task == "ShowVersion" then
@@ -1548,7 +1548,7 @@ function Catalogs.draw()
 				elseif task == "SwapXO" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS[Settings.KeyType], COLOR_SUBFONT)
 				elseif task == "CheckUpdate" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.LatestVersion .. Settings.LateVersion, tonumber(Settings.LateVersion) > tonumber(Settings.Version) and COLOR_ROYAL_BLUE or COLOR_SUBFONT)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.LatestVersion .. Settings.LateVersion, tonumber(Settings.LateVersion) > tonumber(Settings.Version) and UI.color("SELECTOR") or COLOR_SUBFONT)
 				elseif task == "SaveDataPath" then
 					Font.print(FONT16, 225, y - 44, Settings.SaveDataPath, COLOR_SUBFONT)
 				elseif task == "AnimatedGif" then
@@ -1573,12 +1573,12 @@ function Catalogs.draw()
 				local y = gridY(i)
 				DrawManga(x + MANGA_WIDTH / 2, y + MANGA_HEIGHT / 2, currentMangaList[i])
 				UI.roundCorners(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, COLOR_BACK)
-				UI.roundBorder(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, 1, Color.new(128, 148, 168, 85))
+				UI.roundBorder(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, 1, UI.color("BORDER"))
 				if status == "LIBRARY" and currentMangaList[i].Counter then
 					local c = currentMangaList[i].Counter
 					if c > 0 then
-						UI.roundRect(x + 6, x + Font.getTextWidth(BONT16, c) + 22, y + 6, y + 30, Color.new(15, 89, 156, 240))
-						Font.print(BONT16, x + 14, y + 8, tostring(c), COLOR_WHITE)
+						UI.roundRect(x + 6, x + Font.getTextWidth(BONT16, c) + 22, y + 6, y + 30, UI.color("PRIMARY", 0.94))
+						Font.print(BONT16, x + 14, y + 8, tostring(c), UI.color("ON_PRIMARY"))
 					end
 				end
 			end
@@ -1620,7 +1620,7 @@ function Catalogs.draw()
 			dy = dy + line.Height + 4
 		end
 		if isGrid() then
-			Graphics.drawImage(570, 192 - floor(height / 2), status == "HISTORY" and HistoryIcon.e or status == "MANGA" and SearchIcon.e or StarIcon.e, COLOR_ROYAL_BLUE)
+			Graphics.drawImage(570, 192 - floor(height / 2), status == "HISTORY" and HistoryIcon.e or status == "MANGA" and SearchIcon.e or StarIcon.e, UI.color("SELECTOR"))
 		elseif smile then
 			Font.print(FONT26, 582 - math.floor(Font.getTextWidth(FONT26, smile) / 2), 272 - math.floor(height / 2) + dy + 6, smile, Themes[Settings.Theme].COLOR_SUBFONT)
 		end

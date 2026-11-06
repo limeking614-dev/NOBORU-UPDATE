@@ -47,12 +47,12 @@ end
 
 function Changes.draw()
 	if str and yOffset < 544 then
-		Graphics.fillRect(60, 900, yOffset, yOffset + Font.getTextHeight(FONT20, str) + 20, Color.new(0, 0, 0, 220))
+		Graphics.fillRect(60, 900, yOffset, yOffset + Font.getTextHeight(FONT20, str) + 20, UI.color("SURFACE"))
 		local s = str
 		if is_app_updating then
 			s = (str:match("(.+)\n(.-)\n(.-)$") .. "\n" .. "(" .. BytesToStr(Network.getDownloadedBytes()) .. "/" .. SettingsFunctions.GetLastVpkSize() .. ") " .. Language[Settings.Language].SETTINGS.PleaseWait)
 		end
-		Font.print(FONT20, 80, yOffset + 10, s, COLOR_WHITE)
+		Font.print(FONT20, 80, yOffset + 10, s, UI.color("FONT"))
 	end
 end
 

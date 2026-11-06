@@ -39,14 +39,20 @@ ChapterSaver.is_downloading = function(chapter)
 end
 ChapterSaver.stop = function(chapter) downloaded = chapter.Link end
 ChapterSaver.delete = function(chapter) downloaded = chapter.Link end
-DrawDetailsManga = noop
+local posterWidth, ctaWidth
+DrawDetailsManga = function(_, _, _, scale) posterWidth = MANGA_WIDTH * scale end
+local fillRoundRect = UI.fillRoundRect
+UI.fillRoundRect = function(left, right, top, bottom, ...)
+	if top == 420 and bottom == 488 then ctaWidth = right - left end
+	return fillRoundRect(left, right, top, bottom, ...)
+end
 SettingsFunctions = { ChapterSorting = function()
 	sortChanges = sortChanges + 1
 	Settings.ChapterSorting = Settings.ChapterSorting == '1->N' and 'N->1' or '1->N'
 end }
 Settings.save = noop
 local labels, focus = {}, nil
-Font.print = function(_, _, _, text) labels[tostring(text)] = true end
+Font.print = function(_, x, y, text) labels[tostring(text)] = { x = x, y = y } end
 Graphics.fillEmptyRect = function() error('details focus must use rounded borders') end
 local originalFocus = UI.focusBorder
 UI.focusBorder = function(...)
@@ -74,6 +80,7 @@ local function tap(x, y)
 end
 open()
 assert(labels['Test manga'] and labels['Chapter 1'] and labels['50%'], 'details must show title, chapters and download progress')
+assert(math.abs(posterWidth - 220) < 0.001 and math.abs(ctaWidth - posterWidth) < 0.001, 'poster and primary CTA must have equal widths')
 Details.input(0, SCE_CTRL_DOWN, {}, {})
 Details.draw()
 assert(focus and focus[1] == 278 and focus[5] == 10, 'chapter selector must use the shared rounded glow')
@@ -82,11 +89,11 @@ assert(read == 1, 'top of first chapter card must open chapter one')
 open()
 tap(900, 180)
 assert(downloaded == 'chapter2', 'chapter action area must stop its download')
-tap(100, 445)
-assert(following, 'library action must add the manga')
-tap(100, 445)
-assert(not following, 'library action must remove the manga')
 tap(100, 510)
+assert(following, 'library action must add the manga')
+tap(100, 510)
+assert(not following, 'library action must remove the manga')
+tap(100, 445)
 assert(read == 1, 'start button must open the first chapter')
 open()
 Details.input(0, SCE_CTRL_RTRIGGER, {}, {})
@@ -96,12 +103,21 @@ assert(read == 8, 'reverse sorting must map the first visible card to the last c
 open()
 Details.input(0, SCE_CTRL_START, {}, {})
 assert(menus == 1, 'chapter options must remain accessible')
+Cache.getLatestBookmark = function() return 'chapter7' end
+open()
+Details.input(0, SCE_CTRL_CROSS, {}, {})
+assert(read == 7, 'opening details must focus the chapter to continue')
+open()
+tap(100, 445)
+assert(read == 7, 'primary CTA must resume the latest chapter')
+Cache.getLatestBookmark = function() return nil end
 Settings.LoadSummary = true
 open(('Summary description words. '):rep(12))
 for _ = 1, 20 do Details.update() end
 labels = {}
 Details.draw()
 assert(labels[Language.English.DETAILS.EXPAND], 'long summary must keep its expand action')
+assert(labels[Language.English.DETAILS.SUMMARY].x == 294, 'summary heading must share the body padding')
 Details.input(0, SCE_CTRL_LTRIGGER, {}, {})
 for _ = 1, 20 do Details.update() end
 labels = {}

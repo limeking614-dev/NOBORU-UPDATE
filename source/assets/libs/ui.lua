@@ -2,8 +2,17 @@
 UI = { dt = 1000 / 60 }
 local ticker = Timer.new()
 local sidebarBands = {}
-for i = 0, 23 do
-	sidebarBands[i + 1] = COLOR_GRADIENT(Color.new(22, 104, 174), Color.new(9, 30, 65), i / 23)
+local sidebarTheme
+local fallbackRoles = { SURFACE = "SELECTED", HEADER = "BACK", PRIMARY = "ROYAL_BLUE",
+	ON_PRIMARY = "WHITE", ON_PANEL = "FONT", SIDEBAR_TOP = "BLACK", SIDEBAR_BOTTOM = "BLACK",
+	SIDEBAR_FONT = "WHITE", BORDER = "SUBFONT", HIGHLIGHT = "WHITE", SUCCESS = "ROYAL_BLUE",
+	DANGER = "CRIMSON", OVERLAY = "BLACK" }
+
+function UI.color(role, opacity)
+	local palette = Themes[Settings.Theme] or Themes.Light
+	local color = palette["COLOR_" .. role] or _G["COLOR_" .. role] or _G["COLOR_" .. (fallbackRoles[role] or "WHITE")] or COLOR_WHITE
+	if opacity == nil or opacity == 1 then return color end
+	return Color.new(Color.getR(color), Color.getG(color), Color.getB(color), Color.getA(color) * (opacity or 1))
 end
 
 function UI.update()
@@ -17,10 +26,14 @@ function UI.approach(value, target, ms)
 end
 
 function UI.sidebar()
+	if sidebarTheme ~= Settings.Theme then
+		sidebarTheme = Settings.Theme
+		for i = 0, 23 do sidebarBands[i + 1] = COLOR_GRADIENT(UI.color("SIDEBAR_TOP"), UI.color("SIDEBAR_BOTTOM"), i / 23) end
+	end
 	for i = 1, #sidebarBands do
 		Graphics.fillRect(0, 205, (i - 1) * 23, math.min(i * 23, 544), sidebarBands[i])
 	end
-	Graphics.fillRect(204, 205, 0, 544, Color.new(255, 255, 255, 45))
+	Graphics.fillRect(204, 205, 0, 544, UI.color("SIDEBAR_FONT", 0.18))
 end
 
 -- Small rounded corners without extra textures or runtime extensions.
@@ -95,15 +108,15 @@ function UI.focusBorder(left, right, top, bottom, radius, opacity)
 	opacity = opacity or 1
 	local pulse = (1 - math.cos(Timer.getTime(GlobalTimer) * math.pi / 900)) / 2
 	for spread = 3, 1, -1 do
-		UI.roundBorder(left - spread, right + spread, top - spread, bottom + spread, radius + spread, 1, Color.new(65, 166, 255, (22 + 36 * pulse) * (4 - spread) / 3 * opacity))
+		UI.roundBorder(left - spread, right + spread, top - spread, bottom + spread, radius + spread, 1, UI.color("SELECTOR", (22 + 36 * pulse) * (4 - spread) / 765 * opacity))
 	end
-	UI.roundBorder(left, right, top, bottom, radius, 2, Color.new(75, 174, 255, (165 + 90 * pulse) * opacity))
-	UI.roundBorder(left + 2, right - 2, top + 2, bottom - 2, radius - 2, 1, Color.new(181, 232, 255, (65 + 105 * pulse) * opacity))
+	UI.roundBorder(left, right, top, bottom, radius, 2, UI.color("SELECTOR", (165 + 90 * pulse) / 255 * opacity))
+	UI.roundBorder(left + 2, right - 2, top + 2, bottom - 2, radius - 2, 1, UI.color("HIGHLIGHT", (65 + 105 * pulse) / 255 * opacity))
 end
 
 function UI.listCard(top, bottom, active)
-	local background = active and COLOR_SELECTED or COLOR_GRADIENT(COLOR_BACK, COLOR_SELECTED, 0.45)
+	local background = active and COLOR_SELECTED or UI.color("SURFACE")
 	Graphics.fillRect(215, 945, top, bottom, background)
 	UI.roundCorners(215, 945, top, bottom, 10, COLOR_BACK)
-	UI.roundBorder(215, 945, top, bottom, 10, 1, Color.new(128, 148, 168, 85))
+	UI.roundBorder(215, 945, top, bottom, 10, 1, UI.color("BORDER"))
 end

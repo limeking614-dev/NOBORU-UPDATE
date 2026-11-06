@@ -106,7 +106,8 @@ local function focusAlpha(at)
 	Catalogs.draw()
 	for _, rect in ipairs(rectangles) do
 		local color = rect[5]
-		if color and color[1] == 75 and color[2] == 174 then return color[4] end
+		local accent = UI.color('SELECTOR')
+		if rect[1] == 218 and rect[2] == 384 and rect[3] == 64 and color and color[1] == Color.getR(accent) and color[2] == Color.getG(accent) then return color[4] end
 	end
 	error('selected cover must draw a rounded focus border')
 end

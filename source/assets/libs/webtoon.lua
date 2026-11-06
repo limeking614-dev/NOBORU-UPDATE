@@ -78,8 +78,8 @@ local function theme()
 		COLOR_FONT = COLOR_FONT,
 		COLOR_SUBFONT = COLOR_SUBFONT,
 		COLOR_GROUP = COLOR_SELECTED,
-		COLOR_ACCENT = COLOR_ROYAL_BLUE,
-		COLOR_TABBAR = COLOR_PANEL,
+		COLOR_ACCENT = UI.color("SELECTOR"),
+		COLOR_TABBAR = UI.color("SURFACE"),
 		COLOR_TAB_IDLE = COLOR_SUBFONT,
 		COLOR_SEPARATOR = COLOR_SUBFONT
 	}
@@ -1176,13 +1176,13 @@ function Webtoon.draw()
 			local text = currentPage .. "/" .. count
 			local sc = 3
 			local w = glyphWidth(text, sc) + 16
-			fillR(SCREEN_W - w - 8, SCREEN_W - 8, SCREEN_H - 14 - 5 * sc - 8, SCREEN_H - 6, Color.new(0, 0, 0, 170))
-			drawGlyphs(text, SCREEN_W - w, SCREEN_H - 14 - 5 * sc, sc, COLOR_WHITE)
+			fillR(SCREEN_W - w - 8, SCREEN_W - 8, SCREEN_H - 14 - 5 * sc - 8, SCREEN_H - 6, UI.color("SURFACE", 0.92))
+			drawGlyphs(text, SCREEN_W - w, SCREEN_H - 14 - 5 * sc, sc, UI.color("FONT"))
 		elseif show then
 			local text = currentPage .. "/" .. count
 			local w = Font.getTextWidth(FONT16, text) + 20
-			Graphics.fillRect(SCREEN_W - w - 12, SCREEN_W - 12, SCREEN_H - 40, SCREEN_H - 12, Color.new(0, 0, 0, 170))
-			Font.print(FONT16, SCREEN_W - w - 2, SCREEN_H - 36, text, COLOR_WHITE)
+			Graphics.fillRect(SCREEN_W - w - 12, SCREEN_W - 12, SCREEN_H - 40, SCREEN_H - 12, UI.color("SURFACE", 0.92))
+			Font.print(FONT16, SCREEN_W - w - 2, SCREEN_H - 36, text, UI.color("FONT"))
 		end
 	end
 
@@ -1190,13 +1190,13 @@ function Webtoon.draw()
 		local text = floor(zoom * 100 + 0.5) .. "%"
 		local sc = 4
 		local w = glyphWidth(text, sc) + 20
-		fillR(SCREEN_W / 2 - w / 2, SCREEN_W / 2 + w / 2, 10, 10 + 5 * sc + 16, Color.new(0, 0, 0, 170))
-		drawGlyphs(text, SCREEN_W / 2 - glyphWidth(text, sc) / 2, 18, sc, COLOR_WHITE)
+		fillR(SCREEN_W / 2 - w / 2, SCREEN_W / 2 + w / 2, 10, 10 + 5 * sc + 16, UI.color("SURFACE", 0.92))
+		drawGlyphs(text, SCREEN_W / 2 - glyphWidth(text, sc) / 2, 18, sc, UI.color("FONT"))
 	elseif zoomLabel and Timer.getTime(zoomTimer) < 1200 then
 		local text = floor(zoom * 100 + 0.5) .. "%"
 		local w = Font.getTextWidth(FONT20, text) + 24
-		Graphics.fillRect(480 - w / 2, 480 + w / 2, 14, 46, Color.new(0, 0, 0, 170))
-		Font.print(FONT20, 480 - Font.getTextWidth(FONT20, text) / 2, 19, text, COLOR_WHITE)
+		Graphics.fillRect(480 - w / 2, 480 + w / 2, 14, 46, UI.color("SURFACE", 0.92))
+		Font.print(FONT20, 480 - Font.getTextWidth(FONT20, text) / 2, 19, text, UI.color("FONT"))
 	end
 
 	drawToolbars(t)

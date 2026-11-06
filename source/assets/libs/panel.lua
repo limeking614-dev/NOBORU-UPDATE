@@ -55,9 +55,8 @@ function Panel.draw()
 	end
 	Graphics.fillRect(0, 960, 521 + y, 524 + y, Color.new(0, 0, 0, 32))
 	Graphics.fillRect(0, 960, 522 + y, 524 + y, Color.new(0, 0, 0, 32))
-	local styled = AppMode == MENU
-	Graphics.fillRect(0, 960, 524 + y, 544, styled and Color.new(13, 51, 88) or COLOR_PANEL)
-	local fontColor = styled and COLOR_WHITE or COLOR_FONT
+	Graphics.fillRect(0, 960, 524 + y, 544, COLOR_PANEL)
+	local fontColor = UI.color("ON_PANEL")
 	local x = 20
 	for i = 1, #hints do
 		local v = hints[i]

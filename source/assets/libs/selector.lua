@@ -89,6 +89,9 @@ function Selector:new(dUp, dDown, dLeft, dRight, capFunction)
 	function p:resetSelected()
 		itemSelected = 0
 	end
+	function p:setSelected(index)
+		itemSelected = math.max(0, math.floor(index))
+	end
 	function p:xaction(foo)
 		onCrossFunction = foo
 	end

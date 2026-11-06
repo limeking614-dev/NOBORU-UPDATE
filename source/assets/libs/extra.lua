@@ -499,11 +499,10 @@ end
 function Extra.draw()
 	if status ~= "END" then
 		local M = oldFade * fade
-		local Alpha = 255 * M
 		local start = math.max(1, math.floor(slider.Y / 80) + 1)
 		local shift = (1 - M) * 544
-		local whiteColor = Color.new(255, 255, 255, Alpha)
-		local blackColor = Color.new(0, 0, 0, Alpha)
+		local whiteColor = UI.color("SURFACE", M)
+		local blackColor = UI.color("FONT", M)
 		local y = shift - slider.Y + start * 80 + extraMenuYDrawStart
 		local optionsListCount = #selectedExtraMenu
 		Graphics.fillRect(0, 960, 0, 544, Color.new(0, 0, 0, 150 * M))
@@ -528,7 +527,7 @@ function Extra.draw()
 		local item = extraSelector.getSelected()
 		if item ~= 0 then
 			y = shift - slider.Y + (item - 1) * 80 + extraMenuYDrawStart
-			local selectedRedColor = Color.new(255, 255, 255, 100 * M * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
+			local selectedRedColor = UI.color("HIGHLIGHT", 0.4 * M * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
 			local ks = math.ceil(2 * math.sin(Timer.getTime(GlobalTimer) / 100))
 			for i = ks, ks + 1 do
 				Graphics.fillEmptyRect(480 - maxExtraMenuWidth / 2 + i + 3, 480 + maxExtraMenuWidth / 2 - i - 2, y + i + 3, y + 75 - i + 2, Themes[Settings.Theme].COLOR_SELECTOR)

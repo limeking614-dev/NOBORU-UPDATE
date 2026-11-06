@@ -3,7 +3,6 @@ Loading = {}
 
 local status = "NONE"
 local PI = math.pi
-local loadingColor = 0
 local loadingCenter = {x = 480, y = 272}
 
 CircleIcon = Image:new(Graphics.loadImage("app0:assets/icons/circle.png"))
@@ -22,11 +21,6 @@ function Loading.setStatus(newStatus, x, y)
 	if status ~= "NONE" then
 		loadingCenter.x = x or 480
 		loadingCenter.y = y or 272
-		if status == "BLACK" then
-			loadingColor = 0
-		elseif status == "WHITE" then
-			loadingColor = 255
-		end
 	end
 	Timer.reset(loadingAnimationTimer)
 end
@@ -37,6 +31,6 @@ function Loading.draw()
 	time = math.min(math.max(status == "NONE" and 1 - time or time, 0), 1)
 	for i = 1, 4 do
 		local a = math.max(math.sin(Timer.getTime(GlobalTimer) / 500 * PI + i * PI / 2), 0)
-		Graphics.drawImage(loadingCenter.x + (i - 3) * 13, loadingCenter.y - 1 - 16 * a, CircleIcon.e, Color.new(loadingColor, loadingColor, loadingColor, (127 + 128 * a) * time))
+		Graphics.drawImage(loadingCenter.x + (i - 3) * 13, loadingCenter.y - 1 - 16 * a, CircleIcon.e, UI.color("FONT", (127 + 128 * a) / 255 * time))
 	end
 end

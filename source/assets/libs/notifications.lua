@@ -63,8 +63,8 @@ function Notifications.draw()
 		fade = 1 - (time - 500 - notification[2]) / 500
 	end
 	fade = easingFunction(fade)
-	local NEW_WHITE = Color.new(255, 255, 255, 255 * fade)
-	local NEW_GRAY = Color.new(20, 20, 20, 255 * fade)
+	local NEW_WHITE = UI.color("FONT", fade)
+	local NEW_GRAY = UI.color("SURFACE", fade)
 	local y = 0
 	for i = 1, #notification[1] do
 		local v = notification[1][i]

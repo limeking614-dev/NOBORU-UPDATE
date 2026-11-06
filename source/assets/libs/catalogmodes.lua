@@ -478,17 +478,17 @@ function CatalogModes.draw()
 	if status ~= "END" then
 		local M = oldFade * fade
 		Graphics.fillRect(0, 960, 0, 544, Color.new(0, 0, 0, 150 * M))
-		Graphics.fillRect(960 - M * 350, 960, 40 + 8 + 50 * #modes, 544, Color.new(0, 0, 0))
+		Graphics.fillRect(960 - M * 350, 960, 40 + 8 + 50 * #modes, 544, UI.color("SURFACE"))
 		local start_i = math.floor((slider.Y - (40 + 8 + 50 * #modes)) / 50) + 1
 		local y = 40 + 50 * #modes + 17 - slider.Y + (math.max(1, start_i) - 1) * 50
 		for n = math.max(1, start_i), math.min(#itemsToDraw, start_i + 12) do
 			if itemsToDraw[n].type == "filter" then
 				local f = itemsToDraw[n].data
-				Font.print(FONT16, 960 - M * 350 + 52, y, f.Name, COLOR_WHITE)
+				Font.print(FONT16, 960 - M * 350 + 52, y, f.Name, UI.color("FONT"))
 				if not f.visible then
-					Graphics.drawImage(960 - M * 350 + 14, y - 1, ShowIcon.e)
+					Graphics.drawImage(960 - M * 350 + 14, y - 1, ShowIcon.e, UI.color("FONT"))
 				else
-					Graphics.drawImage(960 - M * 350 + 14, y - 1, HideIcon.e)
+					Graphics.drawImage(960 - M * 350 + 14, y - 1, HideIcon.e, UI.color("FONT"))
 				end
 			elseif itemsToDraw[n].type == "tag" then
 				local f = itemsToDraw[n].f
@@ -501,51 +501,51 @@ function CatalogModes.draw()
 				if y - 1 + 24 > 8 + 50 * #modes + 8 then
 					if f.Type == "check" then
 						if currentChecked[k][i] then
-							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxCheckedIcon.e)
+							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxCheckedIcon.e, UI.color("FONT"))
 						else
-							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxIcon.e)
+							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxIcon.e, UI.color("FONT"))
 						end
 					elseif f.Type == "checkcross" then
 						if currentChecked[k][i] then
 							if currentChecked[k][i] == "cross" then
-								Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxCrossedIcon.e, Color.new(255, 255, 255, 100))
+								Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxCrossedIcon.e, UI.color("FONT", 0.4))
 							else
-								Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxCheckedIcon.e)
+								Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxCheckedIcon.e, UI.color("FONT"))
 							end
 						else
-							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxIcon.e)
+							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, CheckboxIcon.e, UI.color("FONT"))
 						end
 					elseif f.Type == "radio" then
 						if currentChecked[k] == i then
-							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, RadioCheckedIcon.e)
+							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, RadioCheckedIcon.e, UI.color("FONT"))
 						else
-							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, RadioIcon.e)
+							Graphics.drawImage(960 - M * 350 + 14 + 20, y - 1, RadioIcon.e, UI.color("FONT"))
 						end
 					end
 					if type(currentChecked[k]) == "table" and currentChecked[k][i] == "cross" then
-						Font.print(FONT16, 960 - M * 350 + 52 + 20, y, v, Color.new(255, 255, 255, 100))
+						Font.print(FONT16, 960 - M * 350 + 52 + 20, y, v, UI.color("FONT", 0.4))
 					else
-						Font.print(FONT16, 960 - M * 350 + 52 + 20, y, v, COLOR_WHITE)
+						Font.print(FONT16, 960 - M * 350 + 52 + 20, y, v, UI.color("FONT"))
 					end
 				end
 			end
 			y = y + 50
 		end
-		Graphics.fillRect(960 - M * 350, 960, 0, 40 + 8 + 50 * #modes, Color.new(0, 0, 0))
+		Graphics.fillRect(960 - M * 350, 960, 0, 40 + 8 + 50 * #modes, UI.color("SURFACE"))
 		for i = 1, #modes do
 			local v = modes[i]
 			if v == "Popular" then
-				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, HotIcon.e, COLOR_GRADIENT(COLOR_GRAY, Color.new(255, 106, 0), modesFade[v]))
+				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, HotIcon.e, COLOR_GRADIENT(UI.color("SUBFONT"), UI.color("SELECTOR"), modesFade[v]))
 			elseif v == "Latest" then
-				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, HistoryIcon.e, COLOR_GRADIENT(COLOR_GRAY, Color.new(0, 188, 18), modesFade[v]))
+				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, HistoryIcon.e, COLOR_GRADIENT(UI.color("SUBFONT"), UI.color("SELECTOR"), modesFade[v]))
 			elseif v == "Search" then
-				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, SearchIcon.e, COLOR_GRADIENT(COLOR_GRAY, Color.new(255, 74, 58), modesFade[v]))
+				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, SearchIcon.e, COLOR_GRADIENT(UI.color("SUBFONT"), UI.color("SELECTOR"), modesFade[v]))
 			elseif v == "ByLetter" then
-				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, LetterAIcon.e, COLOR_GRADIENT(COLOR_GRAY, Color.new(255, 216, 0), modesFade[v]))
+				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, LetterAIcon.e, COLOR_GRADIENT(UI.color("SUBFONT"), UI.color("SELECTOR"), modesFade[v]))
 			elseif v == "ByTag" then
-				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, TagIcon.e, COLOR_GRADIENT(COLOR_GRAY, Color.new(127, 201, 255), modesFade[v]))
+				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, TagIcon.e, COLOR_GRADIENT(UI.color("SUBFONT"), UI.color("SELECTOR"), modesFade[v]))
 			elseif v == "Alphabet" then
-				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, AZIcon.e, COLOR_GRADIENT(COLOR_GRAY, COLOR_ROYAL_BLUE, modesFade[v]))
+				Graphics.drawImage(960 - M * 350 + 14, 17 + 40 + (i - 1) * 50 - 1, AZIcon.e, COLOR_GRADIENT(UI.color("SUBFONT"), UI.color("SELECTOR"), modesFade[v]))
 			end
 			local text = Language[Settings.Language].MODES[modes[i]] or modes[i] or ""
 			if modes[i] == "Search" and searchData:gsub("%s", "") ~= "" then
@@ -557,32 +557,32 @@ function CatalogModes.draw()
 			if modes[i] == "ByTag" then
 				text = text .. " < " .. currentTags[currentTagsIndex] .. " >"
 			end
-			Font.print(FONT16, 960 - M * 350 + 52, 17 + 40 + (i - 1) * 50, text, COLOR_GRADIENT(COLOR_GRAY, COLOR_WHITE, modesFade[v]))
+			Font.print(FONT16, 960 - M * 350 + 52, 17 + 40 + (i - 1) * 50, text, COLOR_GRADIENT(UI.color("SUBFONT"), UI.color("FONT"), modesFade[v]))
 			if i == selectedIndex then
 				local y = 42 + (i - 1) * 50
-				local selectedRedColor = Color.new(255, 255, 255, 100 * M * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
+				local selectedRedColor = UI.color("HIGHLIGHT", 0.4 * M * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
 				local ks = math.ceil(2 * math.sin(Timer.getTime(GlobalTimer) / 100))
 				for n = ks, ks + 1 do
-					Graphics.fillEmptyRect(960 + 5 - 350 * M + n, 960 - 10 - n - 350 * M + 350, y + n + 2, y + 50 - n + 1, Color.new(255, 0, 51))
+					Graphics.fillEmptyRect(960 + 5 - 350 * M + n, 960 - 10 - n - 350 * M + 350, y + n + 2, y + 50 - n + 1, UI.color("SELECTOR"))
 					Graphics.fillEmptyRect(960 + 5 - 350 * M + n, 960 - 10 - n - 350 * M + 350, y + n + 2, y + 50 - n + 1, selectedRedColor)
 				end
 			end
 		end
 		if selectedIndex > #modes then
 			local y = 40 + 50 * #modes - slider.Y + 50 * (selectedIndex - #modes - 1) + 2
-			local selectedRedColor = Color.new(255, 255, 255, 100 * M * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
+			local selectedRedColor = UI.color("HIGHLIGHT", 0.4 * M * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
 			local ks = math.ceil(2 * math.sin(Timer.getTime(GlobalTimer) / 100))
 			for n = ks, ks + 1 do
-				Graphics.fillEmptyRect(960 + 5 - 350 * M + n, 960 - 10 - n - 350 * M + 350, y + n + 2, y + 50 - n + 1, Color.new(255, 0, 51))
+				Graphics.fillEmptyRect(960 + 5 - 350 * M + n, 960 - 10 - n - 350 * M + 350, y + n + 2, y + 50 - n + 1, UI.color("SELECTOR"))
 				Graphics.fillEmptyRect(960 + 5 - 350 * M + n, 960 - 10 - n - 350 * M + 350, y + n + 2, y + 50 - n + 1, selectedRedColor)
 			end
 		end
 		Graphics.fillRect(960 - (M - 1) * 350 - 5, 960, 40 + 8 + 50 * #modes, 544, COLOR_BLACK)
 		if countFilterElements() > 7 then
 			local h = getFiltersHeight() / (544 - 40 - 8 - 50 * #modes)
-			Graphics.fillRect(960 - (M - 1) * 350 - 5, 960, 40 + 8 + 50 * #modes + (slider.Y) / h, 8 + 8 + 50 * #modes + (slider.Y + (544 - 8 - 8 - 50 * #modes)) / h, COLOR_WHITE)
+			Graphics.fillRect(960 - (M - 1) * 350 - 5, 960, 40 + 8 + 50 * #modes + (slider.Y) / h, 8 + 8 + 50 * #modes + (slider.Y + (544 - 8 - 8 - 50 * #modes)) / h, UI.color("FONT"))
 		end
-		Font.print(BONT30, 960 - (M - 0.5) * 350 - Font.getTextWidth(BONT30, Name) / 2, 4, Name, COLOR_WHITE)
+		Font.print(BONT30, 960 - (M - 0.5) * 350 - Font.getTextWidth(BONT30, Name) / 2, 4, Name, UI.color("FONT"))
 	end
 end
 
