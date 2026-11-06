@@ -63,15 +63,7 @@ SCE_RIGHT_STICK_SENSITIVITY = 1
 SCE_CTRL_REAL_CROSS = SCE_CTRL_CROSS
 SCE_CTRL_REAL_CIRCLE = SCE_CTRL_CIRCLE
 
-FONT16 = Font.load("app0:roboto.ttf")
-FONT20 = Font.load("app0:roboto.ttf")
-FONT26 = Font.load("app0:roboto.ttf")
-BONT16 = Font.load("app0:robboto.ttf")
-BONT30 = Font.load("app0:robboto.ttf")
-
-Font.setPixelSizes(FONT20, 20)
-Font.setPixelSizes(FONT26, 26)
-Font.setPixelSizes(BONT30, 30)
+loadlib("fonts")
 
 local doesDirExist = System.doesDirExist
 local createDirectory = System.createDirectory

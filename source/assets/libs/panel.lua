@@ -55,9 +55,10 @@ function Panel.draw()
 	end
 	Graphics.fillRect(0, 960, 521 + y, 524 + y, Color.new(0, 0, 0, 32))
 	Graphics.fillRect(0, 960, 522 + y, 524 + y, Color.new(0, 0, 0, 32))
-	local library = AppMode == MENU and Menu.getMode() == "LIBRARY"
-	Graphics.fillRect(0, 960, 524 + y, 544, library and Color.new(13, 51, 88) or COLOR_PANEL)
-	local fontColor = library and COLOR_WHITE or COLOR_FONT
+	local mode = Menu.getMode()
+	local styled = AppMode == MENU and (mode == "LIBRARY" or mode == "HISTORY" or mode == "IMPORT" or mode == "SETTINGS" or mode == "CATALOGS")
+	Graphics.fillRect(0, 960, 524 + y, 544, styled and Color.new(13, 51, 88) or COLOR_PANEL)
+	local fontColor = styled and COLOR_WHITE or COLOR_FONT
 	local x = 20
 	for i = 1, #hints do
 		local v = hints[i]

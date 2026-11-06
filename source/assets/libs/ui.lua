@@ -90,3 +90,10 @@ function UI.focusBorder(left, right, top, bottom, radius)
 	UI.roundBorder(left, right, top, bottom, radius, 2, Color.new(75, 174, 255, 165 + 90 * pulse))
 	UI.roundBorder(left + 2, right - 2, top + 2, bottom - 2, radius - 2, 1, Color.new(181, 232, 255, 65 + 105 * pulse))
 end
+
+function UI.listCard(top, bottom, active)
+	local background = active and COLOR_SELECTED or COLOR_GRADIENT(COLOR_BACK, COLOR_SELECTED, 0.45)
+	Graphics.fillRect(215, 945, top, bottom, background)
+	UI.roundCorners(215, 945, top, bottom, 10, COLOR_BACK)
+	UI.roundBorder(215, 945, top, bottom, 10, 1, Color.new(128, 148, 168, 85))
+end

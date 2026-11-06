@@ -23,7 +23,7 @@ local touchTimer = Timer.new()
 
 local status = "CATALOGS"
 local function gridTop()
-	return status == "LIBRARY" and 64 or 6
+	return (status == "LIBRARY" or status == "HISTORY") and 64 or 6
 end
 
 local function gridY(index)
@@ -37,7 +37,7 @@ local downloadedImages = {}
 local page = 1
 local currentMangaList = {}
 local function gridLimit()
-	return max(0, ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 6) + gridTop() - 6 - (status == "LIBRARY" and 524 or 518))
+	return max(0, ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 6) + gridTop() - 6 - ((status == "LIBRARY" or status == "HISTORY") and 524 or 518))
 end
 local parsersList = {}
 
@@ -900,7 +900,7 @@ function Catalogs.input(oldpad, pad, oldtouch, touch)
 	end
 	if TOUCH_MODES.MODE == TOUCH_MODES.SLIDE and oldtouch.x and touch.x and touch.x > 205 then
 		slider.V = oldtouch.y - touch.y
-		if status == "LIBRARY" then
+		if status == "LIBRARY" or status == "HISTORY" then
 			slider.V = slider.V * (1000 / 60) / UI.dt
 		end
 	end
@@ -1002,7 +1002,7 @@ function Catalogs.update()
 	if pcSync and not Threads.check(pcSync) then
 		finishPcSync()
 	end
-	if status == "LIBRARY" then
+	if status == "LIBRARY" or status == "HISTORY" then
 		local frames = UI.dt / (1000 / 60)
 		-- Integrate exponential drag so travel is independent of frame rate.
 		local decay = math.pow(1 / 1.12, frames)
@@ -1033,7 +1033,7 @@ function Catalogs.update()
 		local item = mangaSelector:getSelected()
 		if item ~= 0 then
 			local target = floor((item - 1) / 4) * (MANGA_HEIGHT + 6) + MANGA_HEIGHT / 2 - 232
-			if status == "LIBRARY" then
+			if status == "LIBRARY" or status == "HISTORY" then
 				slider.Y = UI.approach(slider.Y, min(gridLimit(), max(0, target + gridTop() / 2)), 90)
 			else
 				slider.Y = slider.Y + (target - slider.Y) / 8
@@ -1206,13 +1206,7 @@ function Catalogs.draw()
 		local selected = parserSelector:getSelected()
 		for i = first, last do
 			local parser = parsersList[i]
-			local background = COLOR_GRADIENT(COLOR_BACK, COLOR_SELECTED, 0.45)
-			if slider.ItemID == i or selected == i then
-				background = COLOR_SELECTED
-			end
-			Graphics.fillRect(215, 945, y - 70, y - 3, background)
-			UI.roundCorners(215, 945, y - 70, y - 3, 10, COLOR_BACK)
-			UI.roundBorder(215, 945, y - 70, y - 3, 10, 1, Color.new(128, 148, 168, 85))
+			UI.listCard(y - 70, y - 3, slider.ItemID == i or selected == i)
 			local favourite = Settings.FavouriteParsers[parser.ID]
 			local badge = parser.isNew and "New" or (parser.isUpdated and "Updated" or "")
 			local nameWidth = 560 - (favourite and 24 or 0) - (parser.NSFW and 54 or 0) - (badge ~= "" and Font.getTextWidth(FONT16, badge) + 10 or 0)
@@ -1276,28 +1270,19 @@ function Catalogs.draw()
 		local y = start * 75 - slider.Y
 		for i = start, min(#list, start + 9) do
 			local object = list[i]
-			if slider.ItemID == i then
-				Graphics.fillRect(215, 945, y - 75, y - 1, COLOR_SELECTED)
-			end
+			UI.listCard(y - 70, y - 3, slider.ItemID == i or importSelector:getSelected() == i)
 			if object.active then
-				Font.print(FONT26, 225, y - 70, object.name, COLOR_FONT)
+				Font.print(FONT26, 229, y - 64, FitText(FONT26, object.name, 610), COLOR_FONT)
 			elseif object.directory then
-				Font.print(FONT26, 225, y - 70, "*" .. Language[Settings.Language].IMPORT.EXTERNAL_MEMORY .. "*", COLOR_ROYAL_BLUE)
+				Font.print(FONT26, 229, y - 64, FitText(FONT26, Language[Settings.Language].IMPORT.EXTERNAL_MEMORY, 610), COLOR_ROYAL_BLUE)
 			else
-				Font.print(FONT26, 225, y - 70, object.name, COLOR_SUBFONT)
-			end
-			Graphics.fillRect(945, 955, y - 75, y - 1, COLOR_BACK)
-			if object.active and object.name ~= "..." then
-				if slider.ItemID == i then
-					Graphics.fillRect(925 - 16 - 12 - 34 + 10, 945, y - 75, y - 1, COLOR_SELECTED)
-				else
-					Graphics.fillRect(925 - 16 - 12 - 34 + 10, 945, y - 75, y - 1, COLOR_BACK)
-				end
+				Font.print(FONT26, 229, y - 64, FitText(FONT26, object.name, 610), COLOR_SUBFONT)
 			end
 			local textDis = object.name == "..." and Language[Settings.Language].IMPORT.GOBACK or object.directory and (object.active and Language[Settings.Language].IMPORT.FOLDER or Language[Settings.Language].IMPORT.DRIVE .. ' "' .. object.name .. '"') or object.active and Language[Settings.Language].IMPORT.FILE or Language[Settings.Language].IMPORT.UNSUPFILE
-			Font.print(FONT16, 225, y - 23 - Font.getTextHeight(FONT16, textDis), textDis, COLOR_SUBFONT)
+			Font.print(FONT16, 229, y - 29, FitText(FONT16, textDis, 610), COLOR_SUBFONT)
 			if object.active and object.name ~= "..." then
-				Graphics.drawImage(925 - 16 - 12, y - 38 - 14, ImportIcon.e, COLOR_ICON_EXTRACT)
+				Graphics.fillRect(865, 866, y - 58, y - 15, COLOR_SUBFONT)
+				Graphics.drawImage(897, y - 49, ImportIcon.e, COLOR_ICON_EXTRACT)
 			end
 			y = y + 75
 		end
@@ -1348,10 +1333,9 @@ function Catalogs.draw()
 		local y = start * 75 - slider.Y
 		for i = start, min(#list, start + 9) do
 			local task = list[i]
-			if slider.ItemID == i then
-				local dyForTranslators = list[i] == "Translators" and 145 or 0
-				Graphics.fillRect(215, 945, y - 75, y - 1 + dyForTranslators, COLOR_SELECTED)
-			end
+			local extraHeight = task == "Translators" and 145 or 0
+			-- Settings use three text lines; the taller credits card keeps its existing extent.
+			UI.listCard(y - 73, y - 2 + extraHeight, slider.ItemID == i or settingSelector:getSelected() == i)
 			if type(task) == "table" then
 				if Settings.getTab() == "DonatorsList" then
 					if i == 1 then
@@ -1585,7 +1569,7 @@ function Catalogs.draw()
 				local x = 580 + (((i - 1) % 4) - 2) * (MANGA_WIDTH + 6) + 3
 				local y = gridY(i)
 				DrawManga(x + MANGA_WIDTH / 2, y + MANGA_HEIGHT / 2, currentMangaList[i])
-				if status == "LIBRARY" then
+				if status == "LIBRARY" or status == "HISTORY" then
 					UI.roundCorners(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, COLOR_BACK)
 					UI.roundBorder(x, x + MANGA_WIDTH, y, y + MANGA_HEIGHT, 10, 1, Color.new(128, 148, 168, 85))
 				end
@@ -1601,7 +1585,7 @@ function Catalogs.draw()
 			if item ~= 0 then
 				local x = 580 + (((item - 1) % 4) - 2) * (MANGA_WIDTH + 6) + MANGA_WIDTH / 2 + 3
 				local y = MANGA_HEIGHT / 2 + gridY(item)
-				if status == "LIBRARY" then
+				if status == "LIBRARY" or status == "HISTORY" then
 					UI.focusBorder(x - MANGA_WIDTH / 2, x + MANGA_WIDTH / 2, y - MANGA_HEIGHT / 2, y + MANGA_HEIGHT / 2, 10)
 				else
 					local wh = Color.new(255, 255, 255, 100 * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
@@ -1643,16 +1627,18 @@ function Catalogs.draw()
 			Font.print(FONT16, 582 - math.floor(line.Width / 2), 272 - math.floor(height / 2) + dy, line.Text, Themes[Settings.Theme].COLOR_SUBFONT)
 			dy = dy + line.Height + 4
 		end
-		if status == "LIBRARY" then
-			Graphics.drawImage(570, 192 - floor(height / 2), StarIcon.e, COLOR_ROYAL_BLUE)
+		if status == "LIBRARY" or status == "HISTORY" then
+			Graphics.drawImage(570, 192 - floor(height / 2), status == "HISTORY" and HistoryIcon.e or StarIcon.e, COLOR_ROYAL_BLUE)
 		elseif smile then
 			Font.print(FONT26, 582 - math.floor(Font.getTextWidth(FONT26, smile) / 2), 272 - math.floor(height / 2) + dy + 6, smile, Themes[Settings.Theme].COLOR_SUBFONT)
 		end
 	end
 	if item and item ~= 0 then
 		local y = item * 75 - slider.Y
-		if status == "CATALOGS" then
+		if status == "CATALOGS" or status == "IMPORT" then
 			UI.focusBorder(215, 945, y - 70, y - 3, 10)
+		elseif status == "SETTINGS" then
+			UI.focusBorder(215, 945, y - 73, y - 2 + itemHeight, 10)
 		else
 			local wh = Color.new(255, 255, 255, 100 * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
 			local ks = math.ceil(4 * math.sin(Timer.getTime(GlobalTimer) / 100))
@@ -1662,11 +1648,11 @@ function Catalogs.draw()
 			end
 		end
 	end
-	if status == "LIBRARY" then
+	if status == "LIBRARY" or status == "HISTORY" then
 		-- Paint the fixed header after the covers to clip their scrolling edge.
 		Graphics.fillRect(205, 960, 0, 58, COLOR_BACK)
 		Graphics.fillRect(221, 945, 57, 58, Color.new(Color.getR(COLOR_FONT), Color.getG(COLOR_FONT), Color.getB(COLOR_FONT), 30))
-		Font.print(FONT26, 223, 15, Language[Settings.Language].APP.LIBRARY, COLOR_FONT)
+		Font.print(FONT26, 223, 15, Language[Settings.Language].APP[status], COLOR_FONT)
 		local count = tostring(#currentMangaList)
 		local width = Font.getTextWidth(FONT20, count)
 		UI.roundRect(929 - width, 945, 15, 43, COLOR_SELECTED)
@@ -1680,10 +1666,11 @@ function Catalogs.draw()
 			local top = 64 + (track - thumb) * max(0, min(1, slider.Y / limit))
 			UI.roundRect(955, 959, top, top + thumb, COLOR_SUBFONT)
 		end
-	elseif status == "CATALOGS" then
+	elseif status == "CATALOGS" or status == "IMPORT" or status == "SETTINGS" then
 		Graphics.fillRect(952, 960, 0, 544, COLOR_BACK)
 		Graphics.fillRect(205, 960, 524, 544, COLOR_BACK)
-		local content = #parsersList * 75
+		local content = (status == "IMPORT" and #Import.listDir() or status == "SETTINGS" and #Settings.list() or #parsersList) * 75
+		if status == "SETTINGS" and Settings.getTab() == "About" then content = content + 140 end
 		if content > 504 then
 			local thumb = max(28, 504 * 504 / content)
 			local top = 10 + (504 - thumb) * max(0, min(1, (slider.Y + 10) / (content - 504)))
