@@ -483,16 +483,15 @@ function Details.draw()
 	local listCount = #chaptersList
 	if continueChapterNumber and listCount > 0 then
 		UI.fillRoundRect(POSTER_LEFT, POSTER_RIGHT, 420 + shift, 488 + shift, 12, UI.color("PRIMARY", M))
-		Graphics.drawImage(43, 435 + shift, ButtonsIcons.Select.e, UI.color("ON_PRIMARY", M))
+		local hintX = POSTER_RIGHT - 12 - ButtonsIcons.Select.Width
+		Graphics.drawImage(hintX, 454 + shift - ButtonsIcons.Select.Height / 2, ButtonsIcons.Select.e, UI.color("ON_PRIMARY", M))
 		local index = continueChapterNumber > 0 and continueChapterNumber or 1
 		local chapter = chaptersList[index]
 		local bookmark = chapter and Cache.getBookmark(chapter)
 		local resume = continueChapterNumber > 0 and (index ~= 1 or bookmark)
 		local buttonText = Language[Settings.Language].DETAILS[resume and "CONTINUE" or "START"]
-		Font.print(FONT20, 70, 429 + shift, FitText(FONT20, buttonText, 166), UI.color("ON_PRIMARY", M))
-		local chapterText = chapter and (chapter.Name or ("Chapter " .. index)) or ""
-		if bookmark ~= nil and bookmark ~= true then chapterText = chapterText .. " · " .. Language[Settings.Language].DETAILS.PAGE .. tostring(bookmark) end
-		Font.print(FONT16, 43, 459 + shift, FitText(FONT16, chapterText, 194), UI.color("ON_PRIMARY", M))
+		buttonText = FitText(FONT20, buttonText, hintX - POSTER_LEFT - 32)
+		Font.print(FONT20, (POSTER_LEFT + hintX) / 2 - Font.getTextWidth(FONT20, buttonText) / 2, 454 + shift - Font.getTextHeight(FONT20, buttonText) / 2, buttonText, UI.color("ON_PRIMARY", M))
 	end
 
 	local start = math.max(1, math.floor(slider.Y / 80) + 1)
@@ -555,8 +554,9 @@ function Details.draw()
 		end
 		if toggle then
 			local label = Language[Settings.Language].DETAILS[is_description_expanded and "SHRINK" or "EXPAND"]
-			Font.print(BONT16, SUMMARY_LEFT, bottom - 26, label, accentColor)
-			Graphics.drawImage(SUMMARY_LEFT + Font.getTextWidth(BONT16, label) + 10, bottom - 26, ButtonsIcons.L.e, secondTextColor)
+			local right = 929
+			Font.print(BONT16, right - 34 - Font.getTextWidth(BONT16, label), bottom - 26, label, accentColor)
+			Graphics.drawImage(right - 24, bottom - 26, ButtonsIcons.L.e, secondTextColor)
 		end
 	end
 	-- The fixed header masks chapter rows and summary text while they scroll.
@@ -565,7 +565,7 @@ function Details.draw()
 	UI.fillRoundRect(16, 72, 8, 56, 12, UI.color("SELECTED", M))
 	Graphics.drawImage(32, 20, BackIcon.e, textColor)
 	local titleRight = isVitaServerManga() and 682 or 770
-	Font.print(BONT30, 94, 4 + shift, FitText(BONT30, selectedManga.Name, titleRight - 94), textColor)
+	Font.print(BONT30, 94, 4 + shift, FitText(BONT30, UI.lower(selectedManga.Name), titleRight - 94), textColor)
 	local parser = GetParserByID(selectedManga.ParserID)
 	local sourceName = parser and parser.Name or (selectedManga.ParserID == "IMPORTED" and Language[Settings.Language].APP.IMPORT or selectedManga.ParserID or "")
 	local subtitle = sourceName .. " · " .. tostring(listCount) .. " chapters"

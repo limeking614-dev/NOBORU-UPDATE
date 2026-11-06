@@ -40,6 +40,11 @@ end
 ChapterSaver.stop = function(chapter) downloaded = chapter.Link end
 ChapterSaver.delete = function(chapter) downloaded = chapter.Link end
 local posterWidth, ctaWidth
+local selectHint, ctaLines = nil, 0
+ButtonsIcons.Select.Width, ButtonsIcons.Select.Height = 64, 16
+Graphics.drawImage = function(x, y, image)
+	if image == ButtonsIcons.Select.e then selectHint = { x = x, y = y } end
+end
 DrawDetailsManga = function(_, _, _, scale) posterWidth = MANGA_WIDTH * scale end
 local fillRoundRect = UI.fillRoundRect
 UI.fillRoundRect = function(left, right, top, bottom, ...)
@@ -52,7 +57,10 @@ SettingsFunctions = { ChapterSorting = function()
 end }
 Settings.save = noop
 local labels, focus = {}, nil
-Font.print = function(_, x, y, text) labels[tostring(text)] = { x = x, y = y } end
+Font.print = function(_, x, y, text)
+	labels[tostring(text)] = { x = x, y = y }
+	if x >= 30 and x < 250 and y >= 420 and y < 488 then ctaLines = ctaLines + 1 end
+end
 Graphics.fillEmptyRect = function() error('details focus must use rounded borders') end
 local originalFocus = UI.focusBorder
 UI.focusBorder = function(...)
@@ -79,8 +87,9 @@ local function tap(x, y)
 	Details.input(0, 0, touch, {})
 end
 open()
-assert(labels['Test manga'] and labels['Chapter 1'] and labels['50%'], 'details must show title, chapters and download progress')
+assert(labels['test manga'] and labels['Chapter 1'] and labels['50%'], 'details must show title, chapters and download progress')
 assert(math.abs(posterWidth - 220) < 0.001 and math.abs(ctaWidth - posterWidth) < 0.001, 'poster and primary CTA must have equal widths')
+assert(selectHint.x == 174 and selectHint.y == 446 and ctaLines == 1, 'CTA must have one text line and a right-aligned Select hint inside its bounds')
 Details.input(0, SCE_CTRL_DOWN, {}, {})
 Details.draw()
 assert(focus and focus[1] == 278 and focus[5] == 10, 'chapter selector must use the shared rounded glow')
@@ -118,6 +127,8 @@ labels = {}
 Details.draw()
 assert(labels[Language.English.DETAILS.EXPAND], 'long summary must keep its expand action')
 assert(labels[Language.English.DETAILS.SUMMARY].x == 294, 'summary heading must share the body padding')
+local more = labels[Language.English.DETAILS.EXPAND]
+assert(more.x + Font.getTextWidth(BONT16, Language.English.DETAILS.EXPAND) == 895, 'expand link must be right-aligned before its button hint')
 Details.input(0, SCE_CTRL_LTRIGGER, {}, {})
 for _ = 1, 20 do Details.update() end
 labels = {}

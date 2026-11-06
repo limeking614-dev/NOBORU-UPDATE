@@ -582,7 +582,8 @@ function CatalogModes.draw()
 			local h = getFiltersHeight() / (544 - 40 - 8 - 50 * #modes)
 			Graphics.fillRect(960 - (M - 1) * 350 - 5, 960, 40 + 8 + 50 * #modes + (slider.Y) / h, 8 + 8 + 50 * #modes + (slider.Y + (544 - 8 - 8 - 50 * #modes)) / h, UI.color("FONT"))
 		end
-		Font.print(BONT30, 960 - (M - 0.5) * 350 - Font.getTextWidth(BONT30, Name) / 2, 4, Name, UI.color("FONT"))
+		local title = UI.lower(Name)
+		Font.print(BONT30, 960 - (M - 0.5) * 350 - Font.getTextWidth(BONT30, title) / 2, 4, title, UI.color("FONT"))
 	end
 end
 

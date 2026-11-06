@@ -1091,8 +1091,8 @@ local function drawToolbars(t)
 	Graphics.fillRect(0, SCREEN_W, ty, ty + TOP_BAR_H, bar)
 	Graphics.fillRect(0, SCREEN_W, ty + TOP_BAR_H - 1, ty + TOP_BAR_H, line)
 	Graphics.drawImage(30, ty + TOP_BAR_H / 2 - 12, BackIcon.e, accent)
-	local name = manga.Name or ""
-	local cname = chapter.Name or ""
+	local name = UI.lower(manga.Name)
+	local cname = UI.lower(chapter.Name)
 	local maxW = SCREEN_W - 88 * 2 - 40
 	local function tickerText(text, font, y, color)
 		local w = Font.getTextWidth(font, text)

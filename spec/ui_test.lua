@@ -190,7 +190,7 @@ local function checkSidebarAlignment()
 	Menu.draw()
 	Graphics.drawImage, Font.print = oldImage, oldPrint
 	local icon = icons['app0:assets/icons/star.png']
-	local label = labels.Library
+	local label = labels.library
 	assert(math.abs(label.x - icon.x - 36) < 0.001, 'icon and label must move together')
 	assert(icon.y + 12 == label.y + 8, 'icon and label must share a vertical center')
 end

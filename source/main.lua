@@ -4,7 +4,7 @@ local logo = Image:new(Graphics.loadImage("app0:assets/images/logo.png"))
 Graphics.initBlend()
 Screen.clear()
 if logo then
-	Graphics.drawImage(480 - 666 / 2, 272 - 172 / 2, logo.e)
+	Graphics.drawScaleImage(480 - 666 * 0.65 / 2, 272 - 172 * 0.65 / 2, logo.e, 0.65, 0.65)
 end
 Graphics.termBlend()
 
@@ -31,6 +31,7 @@ loadlib("net")
 loadlib("parserhandler")
 loadlib("settings")
 loadlib("grid")
+loadlib("splash")
 loadlib("database")
 loadlib("parser")
 loadlib("catalogs")
@@ -88,8 +89,9 @@ local fonts = {
 }
 
 local function preloadData()
-	coroutine.yield("Loading settings")
+	coroutine.yield("Restoring your preferences")
 	local suc, err = pcall(Settings.load, Settings)
+	Splash.ready = true
 	if not suc then
 		Console.error(err)
 	end
@@ -102,38 +104,38 @@ local function preloadData()
 			loadFontString = loadFontString .. (LanguageNames and LanguageNames[langName] and LanguageNames[langName][langName] or "")
 		end
 		for k, v in ipairs(fonts) do
-			coroutine.yield("Loading fonts " .. k .. "/" .. #fonts)
+			coroutine.yield("Preparing the interface")
 			Font.print(v, 0, 0, loadFontString, COLOR_BLACK)
 		end
 	end
-	coroutine.yield("Loading cache, checking existing data")
+	coroutine.yield("Preparing your collection")
 	suc, err = pcall(Cache.load)
 	if not suc then
 		Console.error(err)
 	end
-	coroutine.yield("Loading history")
+	coroutine.yield("Restoring reading history")
 	suc, err = pcall(Cache.loadHistory)
 	if not suc then
 		Console.error(err)
 	end
-	coroutine.yield("Loading library")
+	coroutine.yield("Opening your library")
 	suc, err = pcall(Database.load)
 	if not suc then
 		Console.error(err)
 	end
-	coroutine.yield("Checking saved chapters")
+	coroutine.yield("Checking downloaded chapters")
 	suc, err = pcall(ChapterSaver.load)
 	if not suc then
 		Console.error(err)
 	end
-	coroutine.yield("Loading custom covers")
+	coroutine.yield("Preparing cover artwork")
 	suc, err = pcall(CustomCovers.load)
 	if not suc then
 		Console.error(err)
 	end
 	Menu.setMode("LIBRARY")
 	Panel.show()
-	coroutine.yield("Checking for update")
+	coroutine.yield("Finishing up")
 	suc, err = pcall(SettingsFunctions.CheckDonators)
 	if not suc then
 		Console.error(err)
@@ -152,29 +154,19 @@ local is_touch_locked = false
 local LoadingTimer = Timer.new()
 
 local f = coroutine.create(preloadData)
+local loadingText, loadingProgress = "starting…", nil
 while coroutine.status(f) ~= "dead" do
 	Graphics.initBlend()
-	Screen.clear()
-	local _, text, prog
 	Timer.reset(LoadingTimer)
 	repeat
-		_, text, prog = coroutine.resume(f)
-	until Timer.getTime(LoadingTimer) > 8
-	if not _ then
-		Console.error(text)
-	end
-	if text then
-		Font.print(FONT16, 960 / 2 - Font.getTextWidth(FONT16, text) / 2, 272 + 172 / 2 + 10, text, Color.new(100, 100, 100))
-	end
-	if prog and not Settings.SkipCacheChapterChecking then
-		Graphics.fillRect(150, 150 + 660, 272 + 172 / 2 + 42, 272 + 172 / 2 + 45, Color.new(100, 100, 100))
-		Graphics.fillRect(150, 150 + 660 * prog, 272 + 172 / 2 + 42, 272 + 172 / 2 + 45, COLOR_WHITE)
-	end
-	if logo then
-		Graphics.drawImage(480 - 666 / 2, 272 - 172 / 2, logo.e)
-	end
+		local ok, text, progress = coroutine.resume(f)
+		if not ok then Console.error(text); break end
+		if text then loadingText, loadingProgress = text, progress end
+	until Timer.getTime(LoadingTimer) > 8 or coroutine.status(f) == "dead"
+	Splash.draw(loadingText, not Settings.SkipCacheChapterChecking and loadingProgress or nil)
 	Graphics.termBlend()
 	Screen.flip()
+	Screen.waitVblankStart()
 end
 Timer.destroy(LoadingTimer)
 
@@ -261,7 +253,7 @@ local function update()
 		Changes.update()
 	end
 	if fade > 0 then
-		fade = fade - fade / 8
+		fade = UI.approach(fade, 0, 90)
 		if fade < 1 / 254 then
 			fade = 0
 		end
@@ -299,10 +291,7 @@ local function draw()
 	Loading.draw()
 	CFCheck.draw()
 	if fade > 0 then
-		Graphics.fillRect(0, 960, 0, 544, Color.new(0, 0, 0, 255 * fade))
-		if logo then
-			Graphics.drawImage(480 - 666 / 2, 272 - 172 / 2, logo.e, Color.new(255, 255, 255, 255 * fade))
-		end
+		Splash.draw("ready", 1, fade)
 	elseif logo and logo.free then
 		logo:free()
 		logo = nil
