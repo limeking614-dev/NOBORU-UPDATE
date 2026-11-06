@@ -361,9 +361,9 @@ function Details.input(oldPad, pad, oldTouch, touch)
 			end
 		end
 		if oldTouch.x and not touch.x then
-			if oldTouch.x > POSTER_LEFT and oldTouch.x < POSTER_RIGHT and oldTouch.y > 496 and oldTouch.y < 536 then
+			if oldTouch.x > POSTER_LEFT and oldTouch.x < POSTER_RIGHT and oldTouch.y > 480 and oldTouch.y < 528 then
 				addToLibrary()
-			elseif oldTouch.x > POSTER_LEFT and oldTouch.x < POSTER_RIGHT and oldTouch.y > 420 and oldTouch.y < 488 then
+			elseif oldTouch.x > POSTER_LEFT and oldTouch.x < POSTER_RIGHT and oldTouch.y > 420 and oldTouch.y < 468 then
 				if continueChapterNumber then
 					readChapter(continueChapterNumber > 0 and continueChapterNumber or 1)
 				end
@@ -475,23 +475,25 @@ function Details.draw()
 	UI.roundCorners(POSTER_LEFT, POSTER_RIGHT, 78 + shift, 408 + shift, 12, UI.color("SURFACE", M))
 	UI.roundBorder(POSTER_LEFT, POSTER_RIGHT, 78 + shift, 408 + shift, 12, 1, UI.color("BORDER", M))
 	local following = Database.check(selectedManga)
-	UI.fillRoundRect(POSTER_LEFT, POSTER_RIGHT, 496 + shift, 536 + shift, 10, UI.color("SURFACE", M))
-	Graphics.drawImage(43, 504 + shift, StarIcon.e, following and accentColor or secondTextColor)
-	Graphics.drawImage(224, 508 + shift, ButtonsIcons.Triangle.e, secondTextColor)
+	UI.fillRoundRect(POSTER_LEFT, POSTER_RIGHT, 480 + shift, 528 + shift, 10, UI.color("SURFACE", M))
+	Graphics.drawImage(43, 492 + shift, StarIcon.e, following and accentColor or secondTextColor)
+	Graphics.drawImage(224, 496 + shift, ButtonsIcons.Triangle.e, secondTextColor)
 	local libraryLabel = Language[Settings.Language].DETAILS[following and "REMOVE_FROM_LIBRARY" or "ADD_TO_LIBRARY"]
-	Font.print(FONT16, 75, 507 + shift, FitText(FONT16, libraryLabel, 140), textColor)
+	libraryLabel = FitText(FONT16, UI.capitalize(libraryLabel), 140)
+	Font.print(FONT16, 75, 504 + shift - Font.getTextHeight(FONT16, libraryLabel) / 2, libraryLabel, textColor)
 	local listCount = #chaptersList
 	if continueChapterNumber and listCount > 0 then
-		UI.fillRoundRect(POSTER_LEFT, POSTER_RIGHT, 420 + shift, 488 + shift, 12, UI.color("PRIMARY", M))
+		UI.fillRoundRect(POSTER_LEFT, POSTER_RIGHT, 420 + shift, 468 + shift, 10, UI.color("PRIMARY", M))
+		UI.playIcon(43, 432 + shift, 24, UI.color("ON_PRIMARY", M))
 		local hintX = POSTER_RIGHT - 12 - ButtonsIcons.Select.Width
-		Graphics.drawImage(hintX, 454 + shift - ButtonsIcons.Select.Height / 2, ButtonsIcons.Select.e, UI.color("ON_PRIMARY", M))
+		Graphics.drawImage(hintX, 444 + shift - ButtonsIcons.Select.Height / 2, ButtonsIcons.Select.e, UI.color("ON_PRIMARY", M))
 		local index = continueChapterNumber > 0 and continueChapterNumber or 1
 		local chapter = chaptersList[index]
 		local bookmark = chapter and Cache.getBookmark(chapter)
 		local resume = continueChapterNumber > 0 and (index ~= 1 or bookmark)
 		local buttonText = Language[Settings.Language].DETAILS[resume and "CONTINUE" or "START"]
-		buttonText = FitText(FONT20, buttonText, hintX - POSTER_LEFT - 32)
-		Font.print(FONT20, (POSTER_LEFT + hintX) / 2 - Font.getTextWidth(FONT20, buttonText) / 2, 454 + shift - Font.getTextHeight(FONT20, buttonText) / 2, buttonText, UI.color("ON_PRIMARY", M))
+		buttonText = FitText(FONT16, UI.capitalize(buttonText), hintX - 87)
+		Font.print(FONT16, 75, 444 + shift - Font.getTextHeight(FONT16, buttonText) / 2, buttonText, UI.color("ON_PRIMARY", M))
 	end
 
 	local start = math.max(1, math.floor(slider.Y / 80) + 1)
@@ -565,7 +567,7 @@ function Details.draw()
 	UI.fillRoundRect(16, 72, 8, 56, 12, UI.color("SELECTED", M))
 	Graphics.drawImage(32, 20, BackIcon.e, textColor)
 	local titleRight = isVitaServerManga() and 682 or 770
-	Font.print(BONT30, 94, 4 + shift, FitText(BONT30, UI.lower(selectedManga.Name), titleRight - 94), textColor)
+	Font.print(BONT30, 94, 4 + shift, FitText(BONT30, UI.capitalize(selectedManga.Name), titleRight - 94), textColor)
 	local parser = GetParserByID(selectedManga.ParserID)
 	local sourceName = parser and parser.Name or (selectedManga.ParserID == "IMPORTED" and Language[Settings.Language].APP.IMPORT or selectedManga.ParserID or "")
 	local subtitle = sourceName .. " · " .. tostring(listCount) .. " chapters"

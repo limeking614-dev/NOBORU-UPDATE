@@ -4,7 +4,7 @@ local logo = Image:new(Graphics.loadImage("app0:assets/images/logo.png"))
 Graphics.initBlend()
 Screen.clear()
 if logo then
-	Graphics.drawScaleImage(480 - 666 * 0.65 / 2, 272 - 172 * 0.65 / 2, logo.e, 0.65, 0.65)
+	Graphics.drawImage(480 - 666 / 2, 272 - 172 / 2, logo.e)
 end
 Graphics.termBlend()
 
@@ -31,7 +31,6 @@ loadlib("net")
 loadlib("parserhandler")
 loadlib("settings")
 loadlib("grid")
-loadlib("splash")
 loadlib("database")
 loadlib("parser")
 loadlib("catalogs")
@@ -89,9 +88,8 @@ local fonts = {
 }
 
 local function preloadData()
-	coroutine.yield("Restoring your preferences")
+	coroutine.yield("Loading settings")
 	local suc, err = pcall(Settings.load, Settings)
-	Splash.ready = true
 	if not suc then
 		Console.error(err)
 	end
@@ -104,38 +102,38 @@ local function preloadData()
 			loadFontString = loadFontString .. (LanguageNames and LanguageNames[langName] and LanguageNames[langName][langName] or "")
 		end
 		for k, v in ipairs(fonts) do
-			coroutine.yield("Preparing the interface")
+			coroutine.yield("Loading fonts " .. k .. "/" .. #fonts)
 			Font.print(v, 0, 0, loadFontString, COLOR_BLACK)
 		end
 	end
-	coroutine.yield("Preparing your collection")
+	coroutine.yield("Loading cache, checking existing data")
 	suc, err = pcall(Cache.load)
 	if not suc then
 		Console.error(err)
 	end
-	coroutine.yield("Restoring reading history")
+	coroutine.yield("Loading history")
 	suc, err = pcall(Cache.loadHistory)
 	if not suc then
 		Console.error(err)
 	end
-	coroutine.yield("Opening your library")
+	coroutine.yield("Loading library")
 	suc, err = pcall(Database.load)
 	if not suc then
 		Console.error(err)
 	end
-	coroutine.yield("Checking downloaded chapters")
+	coroutine.yield("Checking saved chapters")
 	suc, err = pcall(ChapterSaver.load)
 	if not suc then
 		Console.error(err)
 	end
-	coroutine.yield("Preparing cover artwork")
+	coroutine.yield("Loading custom covers")
 	suc, err = pcall(CustomCovers.load)
 	if not suc then
 		Console.error(err)
 	end
 	Menu.setMode("LIBRARY")
 	Panel.show()
-	coroutine.yield("Finishing up")
+	coroutine.yield("Checking for update")
 	suc, err = pcall(SettingsFunctions.CheckDonators)
 	if not suc then
 		Console.error(err)
@@ -154,16 +152,23 @@ local is_touch_locked = false
 local LoadingTimer = Timer.new()
 
 local f = coroutine.create(preloadData)
-local loadingText, loadingProgress = "starting…", nil
+local loadingText, loadingProgress = "Loading settings", nil
 while coroutine.status(f) ~= "dead" do
 	Graphics.initBlend()
+	Screen.clear()
 	Timer.reset(LoadingTimer)
 	repeat
 		local ok, text, progress = coroutine.resume(f)
 		if not ok then Console.error(text); break end
 		if text then loadingText, loadingProgress = text, progress end
 	until Timer.getTime(LoadingTimer) > 8 or coroutine.status(f) == "dead"
-	Splash.draw(loadingText, not Settings.SkipCacheChapterChecking and loadingProgress or nil)
+	Font.print(FONT16, 480 - Font.getTextWidth(FONT16, loadingText) / 2, 368, loadingText, Color.new(100, 100, 100))
+	if loadingProgress and not Settings.SkipCacheChapterChecking then
+		local progress = math.max(0, math.min(1, loadingProgress))
+		Graphics.fillRect(150, 810, 400, 403, Color.new(100, 100, 100))
+		Graphics.fillRect(150, 150 + 660 * progress, 400, 403, COLOR_WHITE)
+	end
+	if logo then Graphics.drawImage(480 - 666 / 2, 272 - 172 / 2, logo.e) end
 	Graphics.termBlend()
 	Screen.flip()
 	Screen.waitVblankStart()
@@ -291,7 +296,10 @@ local function draw()
 	Loading.draw()
 	CFCheck.draw()
 	if fade > 0 then
-		Splash.draw("ready", 1, fade)
+		Graphics.fillRect(0, 960, 0, 544, Color.new(0, 0, 0, 255 * fade))
+		if logo then
+			Graphics.drawImage(480 - 666 / 2, 272 - 172 / 2, logo.e, Color.new(255, 255, 255, 255 * fade))
+		end
 	elseif logo and logo.free then
 		logo:free()
 		logo = nil

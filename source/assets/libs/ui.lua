@@ -28,6 +28,30 @@ function UI.lower(text)
 	end))
 end
 
+function UI.capitalize(text)
+	local lower = UI.lower(text)
+	return (lower:gsub("^[%z\1-\127\194-\244][\128-\191]*", function(char)
+		local a, b, c, d = char:byte(1, 4)
+		if a < 128 then return char:upper() end
+		if not u8c or (a >= 240 and not d) or (a >= 224 and not c) then return char end
+		local code = a < 224 and (a - 192) * 64 + b - 128 or a < 240 and (a - 224) * 4096 + (b - 128) * 64 + c - 128 or (a - 240) * 262144 + (b - 128) * 4096 + (c - 128) * 64 + d - 128
+		if (code >= 0x00e0 and code <= 0x00f6) or (code >= 0x00f8 and code <= 0x00fe) or (code >= 0x03b1 and code <= 0x03c1) or (code >= 0x03c3 and code <= 0x03cb) or (code >= 0x0430 and code <= 0x044f) then return u8c(code - 32) end
+		if code >= 0x0450 and code <= 0x045f then return u8c(code - 80) end
+		if code == 0x00ff then return u8c(0x0178) end
+		if code == 0x01b0 then return u8c(0x01af) end
+		if code % 2 == 1 and ((code >= 0x0101 and code <= 0x0137) or (code >= 0x014b and code <= 0x0177) or code == 0x01a1 or (code >= 0x01df and code <= 0x01ef) or (code >= 0x01f9 and code <= 0x0233) or (code >= 0x1e01 and code <= 0x1e95) or (code >= 0x1ea1 and code <= 0x1eff)) then return u8c(code - 1) end
+		if code % 2 == 0 and ((code >= 0x013a and code <= 0x0148) or (code >= 0x017a and code <= 0x017e) or (code >= 0x01ce and code <= 0x01dc)) then return u8c(code - 1) end
+		return char
+	end, 1))
+end
+
+function UI.playIcon(x, y, size, color)
+	for column = 0, size - 1 do
+		local half = (size - column) / 2
+		Graphics.fillRect(x + column, x + column + 1, y + size / 2 - half, y + size / 2 + half, color)
+	end
+end
+
 function UI.color(role, opacity)
 	local palette = Themes[Settings.Theme] or Themes.Light
 	local color = palette["COLOR_" .. role] or _G["COLOR_" .. role] or _G["COLOR_" .. (fallbackRoles[role] or "WHITE")] or COLOR_WHITE

@@ -35,7 +35,7 @@ local function tap(x, y)
 	Extra.input(0, 0, touch, {})
 end
 open()
-assert(labels['chapter options'] and labels['test manga'], 'Start menu must have a lowercase header and manga subtitle')
+assert(labels['Chapter options'] and labels['Test manga'], 'Start menu must have a Sentence-case header and manga subtitle')
 tap(300, 82)
 assert(Extra.getStatus() == 'START', 'tapping the menu header must not dismiss it')
 Extra.input(0, SCE_CTRL_DOWN, {}, {})

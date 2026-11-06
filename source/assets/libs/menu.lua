@@ -141,7 +141,7 @@ function Menu.draw()
 		local offset = active * 2
 		Graphics.drawImage(20 + offset, y + (44 - icon.Height) / 2, icon.e, tint)
 		local label = labels[key] or (key == "PCSOURCES" and "PC SOURCES" or key)
-		label = UI.lower(label)
+		label = UI.capitalize(label)
 		label = FitText(FONT16, label, (key == "DOWNLOAD" and 120 or 132) - offset)
 		Font.print(FONT16, 56 + offset, y + (44 - Font.getTextHeight(FONT16, label)) / 2, label, tint)
 		if key == "DOWNLOAD" and downloadIndicatorValue > 0 then

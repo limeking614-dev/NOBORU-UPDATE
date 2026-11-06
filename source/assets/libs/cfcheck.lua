@@ -399,7 +399,7 @@ function CFCheck.draw()
 	UI.fillRoundRect(x0, x0 + w, y0, y0 + h, 16, UI.color("SURFACE", a))
 	local pulse = 0.7 + 0.3 * math.sin(Timer.getTime(GlobalTimer) / 600)
 	UI.roundBorder(x0, x0 + w, y0, y0 + h, 16, 1, Color.new(Color.getR(accent), Color.getG(accent), Color.getB(accent), 180 * a * pulse))
-	Font.print(FONT26, x0 + 116, y0 + 30, UI.lower(title), UI.color("FONT", a))
+	Font.print(FONT26, x0 + 116, y0 + 30, UI.capitalize(title), UI.color("FONT", a))
 	Font.print(FONT16, x0 + 116, y0 + 68, FitText(FONT16, tostring(host), 492), UI.color("SUBFONT", a))
 	Graphics.fillRect(x0 + 28, x0 + w - 28, y0 + 114, y0 + 115, UI.color("BORDER", a))
 	if state == "CHECKING" then

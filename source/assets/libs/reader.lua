@@ -1516,9 +1516,9 @@ function Reader.draw()
 	RK_ReaderVertical = orientation == "Vertical"
 	RK_BarsShown = MenuFade > 0.02
 	if currentState == STATE_LOADING then
-		local manga_name = UI.lower(Chapters[currentChapterNumber].Manga.Name)
+		local manga_name = UI.capitalize(Chapters[currentChapterNumber].Manga.Name)
 		local prepare_message = Language[Settings.Language].READER.PREPARING_PAGES .. string.sub("...", 1, math.ceil(Timer.getTime(GlobalTimer) / 250) % 4)
-		local chapter_name = UI.lower(Chapters[currentChapterNumber].Name)
+		local chapter_name = UI.capitalize(Chapters[currentChapterNumber].Name)
 		if Font.getTextWidth(BONT30, manga_name) > 960 then
 			Font.print(FONT16, 480 - Font.getTextWidth(FONT16, manga_name) / 2, 242, manga_name, COLOR_FONT)
 		else
@@ -1672,8 +1672,8 @@ function Reader.draw()
 			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, UI.color("SUBFONT", MenuFade))
 		end
 		if Chapters[currentChapterNumber] then
-			local manga_name = UI.lower(Chapters[currentChapterNumber].Manga.Name)
-			local chapter_name = UI.lower(Chapters[currentChapterNumber].Name)
+			local manga_name = UI.capitalize(Chapters[currentChapterNumber].Manga.Name)
+			local chapter_name = UI.capitalize(Chapters[currentChapterNumber].Name)
 			local dif = math.max(Font.getTextWidth(BONT30, manga_name) - 960 + 88 + 32 + 24 + 32 + 24 + 32 + 32, 0)
 			local dif_ch = math.max(Font.getTextWidth(FONT16, chapter_name) - 960 + 88 + 32 + 24 + 32 + 24 + 32 + 32, 0)
 			local ms = 50 * string.len(manga_name)

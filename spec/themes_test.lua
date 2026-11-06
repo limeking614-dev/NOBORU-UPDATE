@@ -29,7 +29,7 @@ Graphics.fillRect = function(left, right, top, bottom, color)
 	if left == 0 and right == 205 and top == 0 then sidebarColor = color end
 end
 Font.print = function(_, _, _, text, color)
-	if text == 'theme test' then titleColor = color end
+	if text == 'Theme test' then titleColor = color end
 end
 Timer.getTime = function() return 100000 end
 Graphics.drawImage = function(_, _, image, color)

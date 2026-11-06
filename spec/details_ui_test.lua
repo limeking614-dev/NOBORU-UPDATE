@@ -39,7 +39,13 @@ ChapterSaver.is_downloading = function(chapter)
 end
 ChapterSaver.stop = function(chapter) downloaded = chapter.Link end
 ChapterSaver.delete = function(chapter) downloaded = chapter.Link end
-local posterWidth, ctaWidth
+local posterWidth, ctaWidth, ctaHeight, libraryWidth, libraryHeight
+local play
+local originalPlay = UI.playIcon
+UI.playIcon = function(x, y, size, color)
+	play = { x = x, y = y, size = size }
+	return originalPlay(x, y, size, color)
+end
 local selectHint, ctaLines = nil, 0
 ButtonsIcons.Select.Width, ButtonsIcons.Select.Height = 64, 16
 Graphics.drawImage = function(x, y, image)
@@ -48,7 +54,8 @@ end
 DrawDetailsManga = function(_, _, _, scale) posterWidth = MANGA_WIDTH * scale end
 local fillRoundRect = UI.fillRoundRect
 UI.fillRoundRect = function(left, right, top, bottom, ...)
-	if top == 420 and bottom == 488 then ctaWidth = right - left end
+	if top == 420 and bottom == 468 then ctaWidth, ctaHeight = right - left, bottom - top end
+	if top == 480 and bottom == 528 then libraryWidth, libraryHeight = right - left, bottom - top end
 	return fillRoundRect(left, right, top, bottom, ...)
 end
 SettingsFunctions = { ChapterSorting = function()
@@ -87,9 +94,11 @@ local function tap(x, y)
 	Details.input(0, 0, touch, {})
 end
 open()
-assert(labels['test manga'] and labels['Chapter 1'] and labels['50%'], 'details must show title, chapters and download progress')
+assert(labels['Test manga'] and labels['Chapter 1'] and labels['50%'], 'details must show title, chapters and download progress')
 assert(math.abs(posterWidth - 220) < 0.001 and math.abs(ctaWidth - posterWidth) < 0.001, 'poster and primary CTA must have equal widths')
-assert(selectHint.x == 174 and selectHint.y == 446 and ctaLines == 1, 'CTA must have one text line and a right-aligned Select hint inside its bounds')
+assert(ctaWidth == libraryWidth and ctaHeight == libraryHeight and ctaHeight == 48, 'both CTAs must have the same dimensions')
+assert(play.x == 43 and play.y + play.size / 2 == 444 and play.size == 24, 'play icon must align with the library icon and button center')
+assert(selectHint.x == 174 and selectHint.y == 436 and ctaLines == 1, 'CTA must have one text line and a right-aligned Select hint inside its bounds')
 Details.input(0, SCE_CTRL_DOWN, {}, {})
 Details.draw()
 assert(focus and focus[1] == 278 and focus[5] == 10, 'chapter selector must use the shared rounded glow')
@@ -102,6 +111,9 @@ tap(100, 510)
 assert(following, 'library action must add the manga')
 tap(100, 510)
 assert(not following, 'library action must remove the manga')
+read = nil
+tap(100, 474)
+assert(read == nil and not following, 'gap between resized buttons must not activate either CTA')
 tap(100, 445)
 assert(read == 1, 'start button must open the first chapter')
 open()

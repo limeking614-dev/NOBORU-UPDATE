@@ -540,15 +540,15 @@ function Extra.draw()
 	if mode == "setChapters" then
 		UI.fillRoundRect(left - 8, right + 8, top + shift, extraMenuYDrawStart + shift - 2, 14, UI.color("SURFACE", M))
 		local heading = selectedPage and "reader options" or "chapter options"
-		Font.print(FONT20, left + 18, top + 7 + shift, heading, UI.color("FONT", M))
-		Font.print(FONT16, left + 18, top + 32 + shift, FitText(FONT16, UI.lower(selectedManga.Name), width - 36), UI.color("SUBFONT", M))
+		Font.print(FONT20, left + 18, top + 7 + shift, UI.capitalize(heading), UI.color("FONT", M))
+		Font.print(FONT16, left + 18, top + 32 + shift, FitText(FONT16, UI.capitalize(selectedManga.Name), width - 36), UI.color("SUBFONT", M))
 		Graphics.fillRect(left + 18, right - 18, extraMenuYDrawStart + shift - 2, extraMenuYDrawStart + shift - 1, UI.color("BORDER", M))
 		local button = Settings.KeyType == "JP" and ButtonsIcons.Cross or ButtonsIcons.Circle
 		Graphics.drawImage(left + 18, bottom - 20 + shift, button.e, Color.new(255, 255, 255, 255 * M))
-		Font.print(FONT16, left + 42, bottom - 22 + shift, UI.lower(Language[Settings.Language].PANEL.BACK or "back"), UI.color("SUBFONT", M))
+		Font.print(FONT16, left + 42, bottom - 22 + shift, UI.capitalize(Language[Settings.Language].PANEL.BACK or "back"), UI.color("SUBFONT", M))
 		local closeX = right - 18 - Font.getTextWidth(FONT16, "close")
 		Graphics.drawImage(closeX - 10 - ButtonsIcons.Start.Width, bottom - 20 + shift, ButtonsIcons.Start.e, Color.new(255, 255, 255, 255 * M))
-		Font.print(FONT16, closeX, bottom - 22 + shift, "close", UI.color("SUBFONT", M))
+		Font.print(FONT16, closeX, bottom - 22 + shift, "Close", UI.color("SUBFONT", M))
 	end
 	if count * 64 > 544 then
 		local thumb = 544 * 544 / (count * 64)

@@ -936,7 +936,7 @@ function GenPanels()
 		"Circle",
 		"Triangle",
 		["L\\R"] = Language[Settings.Language].PANEL.CHANGE_SECTION,
-		Square = Language[Settings.Language].PANEL.MODE,
+		Square = Language[Settings.Language].PANEL.FILTERS,
 		Triangle = Language[Settings.Language].PANEL.JUMPTOPAGE,
 		Circle = Language[Settings.Language].PANEL.BACK,
 		DPad = Language[Settings.Language].PANEL.CHOOSE,
@@ -1658,7 +1658,7 @@ function Catalogs.draw()
 		Graphics.fillRect(205, 960, 0, 58, COLOR_BACK)
 		Graphics.fillRect(221, 945, 57, 58, Color.new(Color.getR(COLOR_FONT), Color.getG(COLOR_FONT), Color.getB(COLOR_FONT), 30))
 		local title = status == "MANGA" and (currentParser and currentParser.Name or Language[Settings.Language].APP.CATALOGS) or Language[Settings.Language].APP[status]
-		Font.print(FONT26, 223, 15, FitText(FONT26, UI.lower(title), 650), COLOR_FONT)
+		Font.print(FONT26, 223, 15, FitText(FONT26, UI.capitalize(title), 650), COLOR_FONT)
 		local count = tostring(#currentMangaList)
 		local width = Font.getTextWidth(FONT20, count)
 		UI.roundRect(929 - width, 945, 15, 43, COLOR_SELECTED)
