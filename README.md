@@ -16,6 +16,42 @@ This repository contains an updated version of the original NOBORU project, with
 
 Noboru provides several features designed to make reading manga on the PS Vita easier.
 
+### ✨ UI Refresh (`feature/ui-refresh`)
+
+This branch updates the interface and improves loading, memory use, and storage access.
+
+- Redesigned sidebar navigation, headers, footer panels, cards, dialogs, notifications, and loading indicators with shared UI components.
+- Updated Library, History, catalogs, search and filter panels, Settings, Downloads, import screens, update notes, and Cloudflare checks for consistent layouts and controls.
+- Improved controller focus, touch targets, scrolling bounds, and empty-library feedback.
+- Consistent sentence-case labels and clearer text wrapping and truncation.
+- Shared, time-based animations for panels, dialogs, selections, reader overlays, and Webtoon transitions, with scrolling that adapts to frame timing.
+- Startup loading messages and progress updates remain visible while fonts and saved chapters are checked.
+
+#### Configurable manga grids
+
+Library, History, and manga catalogs share the same configurable cover layout. In Settings, choose **Display mode** and **Grid columns**:
+
+| Display mode | Title placement |
+|---|---|
+| Compact grid | Titles overlaid on covers |
+| Comfortable grid | Titles below covers |
+| Cover-only | Covers without title captions |
+
+Each mode supports **3, 4, or 5 covers per row**. The default is **Compact grid with 4 columns**. Cover sizing, touch targets, controller navigation, and scrolling follow the selected layout.
+
+#### Themes and multilingual fonts
+
+- Added **Midnight**, **Forest**, **Sepia**, and **OLED** themes alongside Light, Dark, Blue, Crimson, and PiCrestOne. Existing saved theme choices remain supported.
+- Shared theme colors now cover panels, reader controls, the clock, notifications, selection highlights, and status indicators, with contrasting text for colored surfaces.
+- Bundled **Source Sans 3 Regular and SemiBold** for UI text, with the existing multilingual fonts loaded on demand for text containing unsupported glyphs.
+- Text drawing and measurement use the same font fallback to keep alignment and wrapping consistent. Startup font warmup focuses on the selected language.
+
+#### Manga details and downloads
+
+- Reworked the details screen with clearer manga information, a scrollable summary, chapter selection, and Start/Continue actions.
+- Improved chapter read-state indicators and touch/controller handling for reading, downloading, stopping downloads, and deleting downloaded chapters.
+- Clearer download queue states and progress indicators, including preparing, queued, and downloaded chapters.
+
 ### 📚 Manga Catalog
 
 - Browse manga and comic sources.
@@ -44,6 +80,13 @@ Noboru provides several features designed to make reading manga on the PS Vita e
 - Improved handling of manga chapter images.
 - Better compatibility with different website layouts.
 - Improved handling of lazy-loaded images.
+- Cover loading follows the visible grid area and releases images as they leave the loading window.
+- Library lists and sorting are cached; external-storage availability is refreshed periodically instead of being checked for every draw.
+- Cache and downloaded-chapter folder sizes are calculated in bounded background work to keep Settings responsive.
+- Loading library, history, cache, and chapter indexes avoids unnecessary disk rewrites; cache and chapter validation saves repairs when needed.
+- The reader prioritizes the current page, limits nearby-page prefetching when GPU memory is low, and releases page textures and pending work when switching chapters.
+- Image decoding checks dimensions and estimates texture memory using the actual decode size, including sliced long pages.
+- Failed sliced-image loads release partial textures and restart from their own file or download, improving retry and cancellation handling.
 
 ### 🕒 Reader Clock
 
@@ -185,16 +228,41 @@ When reporting an issue, include:
 
 ## 🛠️ Building From Source
 
-This project uses Lua and the NOBORU PlayStation Vita runtime.
+This project uses Lua and packages the bundled NOBORU PlayStation Vita runtime, assets, and fonts into a VPK.
 
-To build the VPK:
+### Linux / POSIX shell
 
-1. Download or clone this repository.
-2. Make sure the required build tools are installed.
-3. Open the project folder.
-4. Execute `build.bat`.
-5. Wait for the build process to finish.
-6. Locate the generated VPK.
+Install [VitaSDK](https://vitasdk.org/) and ensure `vita-pack-vpk` is on your `PATH`. From the repository root, run:
+
+```sh
+./build.sh
+```
+
+The default output is `Noboru-UI.vpk`. To choose another output path:
+
+```sh
+./build.sh /path/to/Noboru.vpk
+```
+
+The package includes Source Sans 3, its license, and the existing multilingual fallback fonts.
+
+### Windows
+
+From the repository root, run [build.bat](./build.bat) with `vita-mksfoex` and `7z` available. This generates `Noboru.vpk` from the contents of [source/](./source/).
+
+### Regression checks
+
+The branch adds standalone Lua checks for UI layout and input, catalog startup, filters, manga details, menus, remaining screens, Cloudflare checks, fonts, theme contrast, grid settings and navigation, animation timing, image retries, and catalog/reader performance.
+
+With Lua 5.2 or later installed, run the branch checks from the repository root, each in its own process:
+
+```sh
+for test in spec/*_test.lua; do
+  lua "$test" || exit 1
+done
+```
+
+The existing language checks use LuaJIT and can be run separately with `sh test.sh`. These host-side checks mock Vita APIs; visual rendering, touch feel, and performance on hardware still require a PS Vita or PS TV.
 
 ---
 
@@ -205,6 +273,7 @@ This project would not exist without the original developers and contributors.
 - **[Creckeryop](https://github.com/Creckeryop/NOBORU)** – Original NOBORU application and development.
 - **[Rinnegatamante](https://github.com/Rinnegatamante/lpp-vita)** – Lua Player Plus for PS Vita.
 - **[VitaSDK](https://github.com/vitasdk)** – PlayStation Vita development tools.
+- **[Adobe Source Sans 3](https://github.com/adobe-fonts/source-sans)** – UI typeface, distributed under the [SIL Open Font License 1.1](./source/SourceSans3-LICENSE.md).
 
 Additional contributors and translators are credited in the original project.
 
