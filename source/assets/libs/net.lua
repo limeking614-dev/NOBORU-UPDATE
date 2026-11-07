@@ -24,7 +24,16 @@ local removeDirectory = RemoveDirectory
 local getImageFormat = System.getImageFormat
 
 local function img2bytes(width, height, dScale)
-	return bit32.band(width + 7, bit32.bnot(7)) * height * 4 / (dScale * dScale) + 1024
+	width, height = math.ceil(width / dScale), math.ceil(height / dScale)
+	return bit32.band(width + 7, bit32.bnot(7)) * height * 4 + 1024
+end
+
+local function decodeScale(width, height, task)
+	local ratio = math.max(task.MaxWidth and width / task.MaxWidth or 1,
+		task.MaxHeight and height / task.MaxHeight or 1)
+	local scale = 1
+	while scale < ratio and scale < 64 do scale = scale * 2 end
+	return scale
 end
 
 local is_net_inited = false
@@ -177,7 +186,7 @@ function Threads.update()
 			elseif currentTask.Type == "Image" then
 				if doesFileExist(currentTask.Path) then
 					local Width, Height = System.getPictureResolution(currentTask.Path)
-					if not Width or Width < 0 then
+					if not Width or not Height or Width <= 0 or Height <= 0 then
 						currentTask.Type = currentTask.Link and "ImageDownload" or currentTask.Type
 						if currentTask.Type == "ImageDownload" then
 							error("Redownloading file")
@@ -209,65 +218,27 @@ function Threads.update()
 							return
 						end
 					end
-					if img2bytes(Width, Height, 1) > Graphics.getFreeMemory() and Height <= 4096 and Height / Width <= 2 then
+					local sliced = Height > 4096 and Height / Width > 2 and not currentTask.MaxHeight and not currentTask.MaxWidth
+					local scale = sliced and 1 or decodeScale(Width, Height, currentTask)
+					-- Slice decoding has no scale parameter in this runtime. Budget the
+					-- real textures, never half-sized metadata for full-sized allocations.
+					local required = img2bytes(Width, Height, scale) + (sliced and (math.ceil(Height / 4096) - 1) * 1024 or 0)
+					if required > Graphics.getFreeMemory() then
 						Console.error("No enough memory to load image")
 						uniques[currentTask.UniqueKey] = nil
 						currentTask = nil
 					else
-						if Height > 4096 and Height / Width > 2 and not currentTask.MaxHeight then
-							if img2bytes(Width, Height, 1) > Graphics.getFreeMemory() then
-								if img2bytes(Width, Height, 2) > Graphics.getFreeMemory() then
-									Console.error("No enough memory to load image")
-									uniques[currentTask.UniqueKey] = nil
-									currentTask = nil
-								else
-									currentTask.Image = {
-										Width = Width / 2,
-										Height = Height / 2,
-										RealWidth = Width,
-										RealHeight = Height,
-										Parts = math.ceil(Height / 8192)
-									}
-								end
-							else
-								currentTask.Image = {
-									Width = Width,
-									Height = Height,
-									RealWidth = Width,
-									RealHeight = Height,
-									Parts = math.ceil(Height / 4096)
-								}
-							end
+						if sliced then
+							currentTask.Image = {
+								Width = Width,
+								Height = Height,
+								RealWidth = Width,
+								RealHeight = Height,
+								Parts = math.ceil(Height / 4096)
+							}
 							Console.write(currentTask.Image.Parts)
 							currentTask.Type = "ImageLoadTable"
 						else
-							local scale = 1
-							if currentTask.MaxWidth and currentTask.MaxHeight then
-								if Width > Height then
-									scale = Width / currentTask.MaxWidth
-								else
-									scale = Height / currentTask.MaxHeight
-								end
-							elseif currentTask.MaxWidth then
-								scale = Width / currentTask.MaxWidth
-							elseif currentTask.MaxHeight then
-								scale = Height / currentTask.MaxHeight
-							end
-							if scale <= 1 then
-								scale = 1
-							elseif scale <= 2 then
-								scale = 2
-							elseif scale <= 4 then
-								scale = 4
-							elseif scale <= 8 then
-								scale = 8
-							elseif scale <= 16 then
-								scale = 16
-							elseif scale <= 32 then
-								scale = 32
-							else
-								scale = 64
-							end
 							if scale == 1 and currentTask.Animated and getImageFormat(currentTask.Path) == "gif" then
 								Graphics.loadGifAsync(currentTask.Path, scale)
 								currentTask.Type = "ImageLoad"
@@ -663,6 +634,19 @@ end
 ---Checks if task is in order by `UniqueKey`
 function Threads.check(uniqueKey)
 	return uniques[uniqueKey] ~= nil
+end
+
+-- Move queued work ahead without restarting the active operation.
+function Threads.promote(uniqueKey)
+	local task = uniques[uniqueKey]
+	if not task or task == currentTask then return end
+	for i = 1, #orderList do
+		if orderList[i] == task then
+			table.remove(orderList, i)
+			table.insert(orderList, 1, task)
+			return
+		end
+	end
 end
 
 ---@return number

@@ -192,11 +192,16 @@ local function deletePageImage(page)
 	end
 end
 
-local function loadPageImage(page)
+local function loadPageImage(page, priority)
+	local add = priority == false and Threads.addTask or Threads.insertTask
 	local PageTable = allPages[page]
+	if Threads.check(PageTable) or ParserManager.check(PageTable) then
+		if priority ~= false and Threads.promote then Threads.promote(PageTable) end
+		return
+	end
 	if not PageTable.Image and not (PageTable.Link == "LoadPrev" or PageTable.Link == "LoadNext") then
 		if PageTable.Extract then
-			Threads.insertTask(
+			add(
 				PageTable,
 				{
 					Type = "UnZipFile",
@@ -218,7 +223,7 @@ local function loadPageImage(page)
 				}
 			)
 		elseif PageTable.Path then
-			Threads.insertTask(
+			add(
 				PageTable,
 				{
 					Type = "Image",
@@ -229,7 +234,7 @@ local function loadPageImage(page)
 				}
 			)
 		elseif PageTable.Link then
-			Threads.insertTask(
+			add(
 				PageTable,
 				{
 					Type = "ImageDownload",
@@ -240,7 +245,7 @@ local function loadPageImage(page)
 				}
 			)
 		else
-			ParserManager.loadPageImage(Chapters[currentChapterNumber].Manga.ParserID, PageTable[1], PageTable, true)
+			ParserManager.loadPageImage(Chapters[currentChapterNumber].Manga.ParserID, PageTable[1], PageTable, priority ~= false)
 		end
 	end
 end
@@ -278,6 +283,17 @@ local function changePage(page)
 			allPages[i].x = 0
 			allPages[i].y = 0
 		end
+	end
+	-- Start preparing the next page on chapter entry as well as after turns.
+	for i = 1, #allPages do
+		if math.abs(i - page) > 1 and (allPages[i].Image or Threads.check(allPages[i]) or ParserManager.check(allPages[i])) then
+			deletePageImage(i)
+		end
+	end
+	local ahead = page + (readDirection == "LEFT" and -1 or 1)
+	if allPages[ahead] and GetGPUMemoryUsed() < MAX_VRAM_MEMORY * 0.65 then
+		loadPageImage(ahead, false)
+		if Threads.promote then Threads.promote(allPages[page]) end
 	end
 	return true
 end
@@ -1095,60 +1111,14 @@ function Reader.update()
 		gesture_touch_update()
 		if allPages.PrevPage and allPages.PrevPage ~= allPages.Page and (((is_down and currentPageOffset.y or currentPageOffset.x) >= 0 and allPages.PrevPage > allPages.Page or (is_down and currentPageOffset.y or currentPageOffset.x) <= 0 and allPages.PrevPage < allPages.Page) and orientation == "Horizontal" or ((is_down and -currentPageOffset.x or currentPageOffset.y) >= 0 and allPages.PrevPage > allPages.Page or (is_down and -currentPageOffset.x or currentPageOffset.y) <= 0 and allPages.PrevPage < allPages.Page) and orientation == "Vertical") then
 			if allPages.PrevPage > 0 and allPages.PrevPage <= #allPages then
-				deletePageImage(allPages.PrevPage)
+				-- Keep one page behind for immediate reverse navigation when memory permits.
+				if GetGPUMemoryUsed() > MAX_VRAM_MEMORY * 0.8 then
+					deletePageImage(allPages.PrevPage)
+				end
 			end
 			local p = allPages.Page + math.sign(allPages.Page - allPages.PrevPage)
-			if p > 0 and p <= #allPages then
-				if not allPages[p].Image and not (allPages[p].Link == "LoadPrev" or allPages[p].Link == "LoadNext") then
-					if allPages[p].Extract then
-						local new_page = allPages[p]
-						Threads.addTask(
-							new_page,
-							{
-								Type = "UnZipFile",
-								Path = new_page.Path,
-								Extract = new_page.Extract,
-								DestPath = "ux0:data/noboru/temp/cache.image",
-								OnComplete = function()
-									Threads.insertTask(
-										new_page,
-										{
-											Type = "Image",
-											Table = new_page,
-											Path = "temp/cache.image",
-											Index = "Image",
-											Animated = Settings.AnimatedGif
-										}
-									)
-								end
-							}
-						)
-					elseif allPages[p].Path then
-						Threads.addTask(
-							allPages[p],
-							{
-								Type = "Image",
-								Path = allPages[p].Path,
-								Table = allPages[p],
-								Index = "Image",
-								Animated = Settings.AnimatedGif
-							}
-						)
-					elseif allPages[p].Link then
-						Threads.addTask(
-							allPages[p],
-							{
-								Type = "ImageDownload",
-								Link = allPages[p].Link,
-								Table = allPages[p],
-								Index = "Image",
-								Animated = Settings.AnimatedGif
-							}
-						)
-					else
-						ParserManager.loadPageImage(Chapters[currentChapterNumber].Manga.ParserID, allPages[p][1], allPages[p], p, false)
-					end
-				end
+			if p > 0 and p <= #allPages and GetGPUMemoryUsed() < MAX_VRAM_MEMORY * 0.65 then
+				loadPageImage(p, false)
 			end
 		end
 		local o = readDirection == "LEFT" and {1, -1, 0} or {-1, 1, 0}
@@ -1728,6 +1698,8 @@ function Reader.loadChapter(chapter)
 		ParserManager.remove(Chapters[currentChapterNumber].Pages)
 	end
 	currentChapterNumber = chapter
+	-- Release native textures and pending work before replacing their owner tables.
+	for i = 1, #allPages do deletePageImage(i) end
 	Chapters[chapter].Pages = {}
 	allPages = {
 		Page = 0

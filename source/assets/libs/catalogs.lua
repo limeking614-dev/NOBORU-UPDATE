@@ -49,6 +49,53 @@ local parsersList = {}
 
 local chaptersFolderSize
 local cacheFolderSize
+local folderSizeRequests = {}
+local folderSizeTask
+local folderSizeKind
+local storageTimer = Timer.new()
+
+local function cancelFolderSizeScan()
+	folderSizeTask, folderSizeKind, folderSizeRequests = nil, nil, {}
+end
+
+-- Directory enumeration belongs in updates. Yield after each directory and entry
+-- so a large collection cannot monopolize a frame while drawing Settings.
+local function updateFolderSizes()
+	if not folderSizeTask then
+		local kind = next(folderSizeRequests)
+		if not kind then return end
+		folderSizeKind = kind
+		folderSizeRequests[kind] = nil
+		folderSizeTask = coroutine.create(function()
+			local total = 0
+			local function scan(path)
+				local entries = listDirectory(path) or {}
+				coroutine.yield()
+				for _, entry in ipairs(entries) do
+					if entry.directory then scan(path .. "/" .. entry.name)
+					else total = total + (entry.size or 0) end
+					coroutine.yield()
+				end
+			end
+			scan("ux0:data/noboru/" .. kind)
+			if kind == "chapters" and doesDirExist("uma0:data/noboru/chapters") then
+				scan("uma0:data/noboru/chapters")
+			end
+			if kind == "chapters" then chaptersFolderSize = total else cacheFolderSize = total end
+		end)
+	end
+	-- A fixed work limit also works on runtimes with coarse timer resolution.
+	for _ = 1, 16 do
+		local ok, err = coroutine.resume(folderSizeTask)
+		if not ok then Console.error(err) end
+		if not ok or coroutine.status(folderSizeTask) == "dead" then
+			folderSizeRequests[folderSizeKind] = nil
+			folderSizeKind = nil
+			folderSizeTask = nil
+			break
+		end
+	end
+end
 local sure_clear_library
 local sure_clear_chapters
 local sure_clear_all_cache
@@ -368,6 +415,7 @@ local function pcDeleteAllSources()
 	end)
 	cacheFolderSize = nil
 	chaptersFolderSize = nil
+	cancelFolderSizeScan()
 	Notifications.push("Added sources deleted (" .. removed .. " saved items removed)")
 end
 
@@ -377,6 +425,7 @@ local function freeMangaImage(manga)
 		if manga.Image and manga.Image.free then
 			manga.Image:free()
 		end
+		manga.Image, manga.newImage = nil, nil
 		manga.ImageDownload = nil
 	end
 end
@@ -384,7 +433,7 @@ end
 local function loadMangaImage(manga)
 	if CustomCovers.hasCustomCover(manga) then
 		local customCoverPath = "ux0:data/noboru/cache/" .. Cache.getKey(manga) .. "/custom_cover.image"
-		if doesFileExist(customCoverPath) and System.getPictureResolution(customCoverPath) or -1 > 0 then
+		if doesFileExist(customCoverPath) and (System.getPictureResolution(customCoverPath) or 0) > 0 then
 			Threads.addTask(
 				manga,
 				{
@@ -498,7 +547,7 @@ local function loadMangaImage(manga)
 		end
 	else
 		local path = manga.Path or ("cache/" .. Cache.getKey(manga) .. "/cover.image")
-		if path and doesFileExist("ux0:data/noboru/" .. path) and System.getPictureResolution("ux0:data/noboru/" .. path) or -1 > 0 then
+		if path and doesFileExist("ux0:data/noboru/" .. path) and (System.getPictureResolution("ux0:data/noboru/" .. path) or 0) > 0 then
 			Threads.addTask(
 				manga,
 				{
@@ -541,40 +590,29 @@ local function loadMangaImage(manga)
 end
 
 local function UpdateMangas()
-	if slider.V == 0 and Timer.getTime(touchTimer) > 200 then
-		local start = Grid.first(slider.Y)
-		local capacity = Grid.capacity()
-		if #downloadedImages > capacity then
-			local newTable = {}
-			for _, i in ipairs(downloadedImages) do
-				if i < start or i > min(#currentMangaList, start + capacity - 1) then
-					freeMangaImage(currentMangaList[i])
-				else
-					newTable[#newTable + 1] = i
-				end
-			end
-			downloadedImages = newTable
+	local start = Grid.first(slider.Y)
+	local capacity = Grid.capacity()
+	local columns = Grid.layout().columns
+	local keepStart = max(1, start - columns)
+	local keepEnd = min(#currentMangaList, start + capacity + columns - 1)
+	for n = #downloadedImages, 1, -1 do
+		local i = downloadedImages[n]
+		local selected = Details.getStatus() ~= "END" and currentMangaList[i] == Details.getManga()
+		if (i < keepStart or i > keepEnd) and not selected then
+			freeMangaImage(currentMangaList[i])
+			table.remove(downloadedImages, n)
 		end
-		for i = start, min(#currentMangaList, start + capacity - 1) do
-			local manga = currentMangaList[i]
-			if not manga.ImageDownload then
-				loadMangaImage(manga)
-				manga.ImageDownload = true
-				downloadedImages[#downloadedImages + 1] = i
-			end
+	end
+	local requested = 0
+	for i = start, min(#currentMangaList, start + capacity - 1) do
+		local manga = currentMangaList[i]
+		if not manga.ImageDownload then
+			loadMangaImage(manga)
+			manga.ImageDownload = true
+			downloadedImages[#downloadedImages + 1] = i
+			requested = requested + 1
+			if requested == 2 then break end
 		end
-	else
-		local newTable = {}
-		for _, i in ipairs(downloadedImages) do
-			local manga = currentMangaList[i]
-			if Threads.check(manga) and (Details.getFade() == 0 or manga ~= Details.getManga()) then
-				Threads.remove(manga)
-				manga.ImageDownload = nil
-			else
-				newTable[#newTable + 1] = i
-			end
-		end
-		downloadedImages = newTable
 	end
 end
 
@@ -655,6 +693,7 @@ local function selectSetting(index)
 				if sure_clear_chapters == 2 then
 					SettingsFunctions[item]()
 					chaptersFolderSize = nil
+					cancelFolderSizeScan()
 					sure_clear_chapters = 0
 				end
 			elseif item == "DeleteAddedSources" then
@@ -673,6 +712,7 @@ local function selectSetting(index)
 				sure_clear_all_cache = sure_clear_all_cache + 1
 				if sure_clear_all_cache == 2 then
 					cacheFolderSize = nil
+					cancelFolderSizeScan()
 					SettingsFunctions[item]()
 					sure_clear_all_cache = 0
 				end
@@ -680,6 +720,7 @@ local function selectSetting(index)
 				sure_clear_cache = sure_clear_cache + 1
 				if sure_clear_cache == 2 then
 					cacheFolderSize = nil
+					cancelFolderSizeScan()
 					SettingsFunctions[item]()
 					sure_clear_cache = 0
 				end
@@ -1020,6 +1061,19 @@ function GenPanels()
 end
 
 function Catalogs.update()
+	updateFolderSizes()
+	if status == "LIBRARY" then
+		if Database.refreshStorage and Timer.getTime(storageTimer) > 1000 then
+			Database.refreshStorage()
+			Timer.reset(storageTimer)
+		end
+		local list = Database.getMangaList()
+		if currentMangaList ~= list then
+			Catalogs.shrink()
+			downloadedImages = {}
+			currentMangaList = list
+		end
+	end
 	if isGrid() then syncGridLayout() end
 	if pcSync and not Threads.check(pcSync) then
 		finishPcSync()
@@ -1083,9 +1137,7 @@ function Catalogs.update()
 				end
 			end
 		end
-		if status == "LIBRARY" and #currentMangaList ~= #Database.getMangaList() then
-			currentMangaList = Database.getMangaList()
-		elseif status == "HISTORY" then
+		if status == "HISTORY" then
 			currentMangaList = Cache.getHistory()
 		end
 	else
@@ -1399,23 +1451,9 @@ function Catalogs.draw()
 					Font.print(FONT16, 225, y - 44, LanguageNames[Settings.Language][Settings.Language], COLOR_FONT)
 				elseif task == "ClearChapters" then
 					if chaptersFolderSize == nil then
-						chaptersFolderSize = 0
-						local function getDirectorySize(dir)
-							local d = listDirectory(dir) or {}
-							for k = 1, #d do
-								if d[k].directory then
-									getDirectorySize(dir .. "/" .. d[k].name)
-								else
-									chaptersFolderSize = chaptersFolderSize + d[k].size
-								end
-							end
-						end
-						getDirectorySize("ux0:data/noboru/chapters")
-						if doesDirExist("uma0:data/noboru/chapters") then
-							getDirectorySize("uma0:data/noboru/chapters")
-						end
+						folderSizeRequests.chapters = true
 					end
-					Font.print(FONT16, 225, y - 44, BytesToStr(chaptersFolderSize), COLOR_SUBFONT)
+					Font.print(FONT16, 225, y - 44, chaptersFolderSize and BytesToStr(chaptersFolderSize) or "...", COLOR_SUBFONT)
 					if sure_clear_chapters > 0 then
 						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
@@ -1541,21 +1579,9 @@ function Catalogs.draw()
 					end
 				elseif task == "ClearAllCache" then
 					if cacheFolderSize == nil then
-						cacheFolderSize = 0
-						local function getDirectorySize(dir)
-							local d = listDirectory(dir) or {}
-							for j = 1, #d do
-								local f = d[j]
-								if f.directory then
-									getDirectorySize(dir .. "/" .. f.name)
-								else
-									cacheFolderSize = cacheFolderSize + f.size
-								end
-							end
-						end
-						getDirectorySize("ux0:data/noboru/cache")
+						folderSizeRequests.cache = true
 					end
-					Font.print(FONT16, 225, y - 44, BytesToStr(cacheFolderSize), COLOR_SUBFONT)
+					Font.print(FONT16, 225, y - 44, cacheFolderSize and BytesToStr(cacheFolderSize) or "...", COLOR_SUBFONT)
 					if sure_clear_all_cache > 0 then
 						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
@@ -1724,6 +1750,8 @@ end
 
 ---@param newStatus string | '"CATALOGS"' | '"MANGA"' | '"LIBRARY"' | '"DOWNLOAD"'
 function Catalogs.setStatus(newStatus)
+	cancelFolderSizeScan()
+	if newStatus == "LIBRARY" and Database.refreshStorage then Database.refreshStorage() end
 	status = newStatus
 	chaptersFolderSize = nil
 	cacheFolderSize = nil

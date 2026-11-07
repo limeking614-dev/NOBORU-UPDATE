@@ -98,9 +98,9 @@ local function preloadData()
 		if Settings.Language == "Vietnamese" then
 			loadFontString = loadFontString .. '\nĂăÂâĐđÊê\nÔôƠơƯư\nÁáÀàẢảÃãẠạĂăẮắẰằẲẳẴẵẶặÂâẤấẦầẨ\nẩẪẫẬậĐđÉéÈèẺẻẼẽẸẹÊêẾếỀ\nềỂểỄễỆệÍíÌìỈỉĨĩỊịÓóÒò\nỎỏÕõỌọÔôỐốỒồỔổỖỗỘộƠ\nơỚớỜờỞởỠỡỢợÚúÙùỦủ\nŨũỤụƯưỨứỪừỬửỮữỰựÝýỲỳỶỷỸ\nỹỴỵ' --to disable lag for vietnamese (very slow loading)
 		end
-		for langName, _ in pairs(Language) do
-			loadFontString = loadFontString .. (LanguageNames and LanguageNames[langName] and LanguageNames[langName][langName] or "")
-		end
+		-- Other scripts load on demand; warming every language forces all fallback faces into RAM.
+		local names = LanguageNames and LanguageNames[Settings.Language]
+		loadFontString = loadFontString .. (names and names[Settings.Language] or "")
 		for k, v in ipairs(fonts) do
 			coroutine.yield("Loading fonts " .. k .. "/" .. #fonts)
 			Font.print(v, 0, 0, loadFontString, COLOR_BLACK)

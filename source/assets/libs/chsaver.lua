@@ -891,8 +891,9 @@ function ChapterSaver.load()
 	if doesFileExist(CHAPTERSAV_PATH) then
 		local fh = openFile(CHAPTERSAV_PATH, FREAD)
 		local loadKeysFunction = load("local " .. readFile(fh, sizeFile(fh)) .. " return Keys")
+		local keys
 		if loadKeysFunction then
-			local keys = loadKeysFunction() or {}
+			keys = loadKeysFunction() or {}
 			local cnt = 0
 			for _, _ in pairs(keys) do
 				cnt = cnt + 1
@@ -907,6 +908,7 @@ function ChapterSaver.load()
 						local pathes = readFile(fh_2, sizeFile(fh_2))
 						closeFile(fh_2)
 						for _, path in ipairs(ToLines(pathes)) do
+							coroutine.yield("ChapterSaver: Checking " .. path, cntr / cnt)
 							if not doesFileExist(path) then
 								removeDirectory(FolderPath .. k)
 								Notifications.push("here chapters_error\n" .. k)
@@ -953,6 +955,7 @@ function ChapterSaver.load()
 			end
 			local dirList = listDirectory("ux0:data/noboru/chapters") or {}
 			for _, v in ipairs(dirList) do
+				coroutine.yield("ChapterSaver: Checking " .. v.name, 1)
 				if not allKeys[v.name] and v.directory then
 					removeDirectory("ux0:data/noboru/chapters/" .. v.name)
 				end
@@ -960,6 +963,7 @@ function ChapterSaver.load()
 			if doesDirExist("uma0:data/noboru") then
 				dirList = listDirectory("uma0:data/noboru/chapters") or {}
 				for _, v in ipairs(dirList) do
+					coroutine.yield("ChapterSaver: Checking " .. v.name, 1)
 					if not allKeys[v.name] and v.directory then
 						removeDirectory("uma0:data/noboru/chapters/" .. v.name)
 					end
@@ -967,7 +971,16 @@ function ChapterSaver.load()
 			end
 		end
 		closeFile(fh)
-		ChapterSaver.save()
+		-- Validation normally leaves the index unchanged; only rewrite repairs.
+		local changed = false
+		if keys then
+			local previous = keys
+			for k, v in pairs(previous) do if allKeys[k] ~= v then changed = true; break end end
+			if not changed then
+				for k, v in pairs(allKeys) do if previous[k] ~= v then changed = true; break end end
+			end
+		else changed = true end
+		if changed then ChapterSaver.save() end
 	end
 end
 

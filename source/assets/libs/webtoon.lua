@@ -2,7 +2,7 @@
 --
 -- * every page is fitted to the screen width and stacked vertically with no gaps
 -- * pages are loaded in full (tall strips are sliced by the NOBORU image loader, we just draw the slices)
--- * the whole chapter is queued in reading order (not one image at a time); VRAM decides what stays loaded
+-- * a bounded window around the viewport is prefetched; VRAM limits it further
 -- * when an image finishes loading above the viewport the scroll offset is corrected, so the content never jumps
 -- * pulling past the end/start of a chapter continues to the next/previous chapter
 Webtoon = {}
@@ -13,6 +13,7 @@ local PI = math.pi
 local sub = RK_SUB or string.sub
 
 local MAX_INFLIGHT = 3 -- page requests kept queued at the same time (the net engine runs them in order)
+local KEEP_BEHIND, KEEP_AHEAD = 2, 4
 local VRAM_SOFT = 0.80 -- stop requesting more pages above this video-memory fraction
 local VRAM_HARD = 0.92 -- start freeing far pages above this fraction
 local EST_RATIO = 1.45 -- placeholder height / width until a real image is measured
@@ -184,6 +185,7 @@ local function layout()
 	contentH = y + footH
 end
 
+local pageAt
 local function measure(p)
 	local image = p.Image
 	if not image then
@@ -193,25 +195,23 @@ local function measure(p)
 	if not w or not h or w <= 0 or h <= 0 then
 		return
 	end
-	local oldH = pageHeight(p)
+	local anchor = pageAt(scrollY)
+	local anchorOffset = scrollY - pages[anchor].top
+	local targetAnchor = targetY and pageAt(targetY)
+	local targetOffset = targetY and targetY - pages[targetAnchor].top
 	p.w = w
 	p.srcH = h
 	rescale(p)
-	local newH = p.h
 	ratioSum = ratioSum + h / w
 	ratioCount = ratioCount + 1
-	-- preserve what the reader is looking at: only content *above* the viewport moves it
-	local delta = newH - oldH
-	if delta ~= 0 and p.top + oldH <= scrollY then
-		scrollY = scrollY + delta
-		if targetY then
-			targetY = targetY + delta
-		end
-	end
 	layout()
+	-- Measuring one page also changes the estimate for every unmeasured page.
+	-- Preserve the actual viewport anchor across that entire layout adjustment.
+	scrollY = pages[anchor].top + anchorOffset
+	if targetAnchor then targetY = pages[targetAnchor].top + targetOffset end
 end
 
-local function pageAt(y)
+pageAt = function(y)
 	-- binary search the page containing content-y `y`
 	if count == 0 then
 		return 1
@@ -391,10 +391,7 @@ local function vramBudgetOk()
 	return GetGPUMemoryUsed() < MAX_VRAM_MEMORY * 0.8
 end
 
----Full-chapter loading: every page of the chapter is queued in reading order (nearest to the viewport first)
----instead of one image at a time while scrolling. Only video memory limits how much stays loaded:
----requests stop above VRAM_SOFT, and above VRAM_HARD the page farthest from the viewport is freed
----(pages behind you go first).
+-- Bound prefetch by page count as well as texture bytes.
 local function memFraction()
 	return GetGPUMemoryUsed() / MAX_VRAM_MEMORY
 end
@@ -408,11 +405,20 @@ local function manageImages()
 	for i = 1, count do
 		local p = pages[i]
 		if p.Image then
+			if (i < cur - KEEP_BEHIND or i > cur + KEEP_AHEAD) and not isVisible(p) then
+				freeImage(p)
+			end
+		end
+		if p.Queued and (i < cur - KEEP_BEHIND or i > cur + KEEP_AHEAD) and not isVisible(p) then
+			freeImage(p)
+		end
+		if p.Image then
 			if not p.h then
 				measure(p)
 			end
-			if p.Queued and not isBusy(p) then
-				p.Queued = false
+			if p.Queued then
+				if isBusy(p) then inflight = inflight + 1
+				else p.Queued = false end
 			end
 		elseif p.Queued then
 			if isBusy(p) then
@@ -438,7 +444,7 @@ local function manageImages()
 			local p = pages[i]
 			if p.Image and not isVisible(p) then
 				local d = i - cur
-				local score = d < 0 and -d or d * 2
+				local score = d < 0 and -d * 2 or d
 				if score > worstScore then
 					worst, worstScore = p, score
 				end
@@ -450,6 +456,11 @@ local function manageImages()
 	end
 
 	-- 3. keep the queue full: visible pages first (priority), then everything ahead, then behind
+	if Threads.promote then
+		for i = pageAt(scrollY + SCREEN_H), pageAt(scrollY), -1 do
+			if pages[i].Queued then Threads.promote(pages[i]) end
+		end
+	end
 	if inflight >= MAX_INFLIGHT then
 		return
 	end
@@ -466,17 +477,17 @@ local function manageImages()
 		end
 		return false
 	end
-	for i = max(1, cur - 1), min(count, cur + 3) do
+	for i = pageAt(scrollY), pageAt(scrollY + SCREEN_H) do
 		if isVisible(pages[i]) and want(i) then
 			return
 		end
 	end
-	for i = cur, count do
+	for i = cur, min(count, cur + KEEP_AHEAD) do
 		if want(i) then
 			return
 		end
 	end
-	for i = cur - 1, 1, -1 do
+	for i = cur - 1, max(1, cur - KEEP_BEHIND), -1 do
 		if want(i) then
 			return
 		end
