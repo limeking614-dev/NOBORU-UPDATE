@@ -45,11 +45,7 @@ local y = 23
 
 ---Updates Panel Animation
 function Panel.update()
-	if status == "HIDE" then
-		y = math.min(23, y + (23 - y) / 4)
-	elseif status == "SHOW" then
-		y = math.max(0, y - y / 4)
-	end
+	y = UI.approach(y, status == "HIDE" and 23 or 0, 60)
 end
 
 ---Draws Panel on screen
@@ -60,6 +56,7 @@ function Panel.draw()
 	Graphics.fillRect(0, 960, 521 + y, 524 + y, Color.new(0, 0, 0, 32))
 	Graphics.fillRect(0, 960, 522 + y, 524 + y, Color.new(0, 0, 0, 32))
 	Graphics.fillRect(0, 960, 524 + y, 544, COLOR_PANEL)
+	local fontColor = UI.color("ON_PANEL")
 	local x = 20
 	for i = 1, #hints do
 		local v = hints[i]
@@ -80,11 +77,11 @@ function Panel.draw()
 					Graphics.drawImage(x, 526 + y, ButtonsIcons.R.e)
 					x = x + 28
 				else
-					Font.print(FONT16, x, 524 + y, v, COLOR_FONT)
+					Font.print(FONT16, x, 524 + y, v, fontColor)
 					x = x + Font.getTextWidth(FONT16, v) + 5
 				end
 			end
-			Font.print(FONT16, x, 524 + y, hints[v], COLOR_FONT)
+			Font.print(FONT16, x, 524 + y, hints[v], fontColor)
 			x = x + Font.getTextWidth(FONT16, hints[v]) + 10
 		end
 	end

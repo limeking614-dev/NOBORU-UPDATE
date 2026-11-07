@@ -3574,3 +3574,23 @@ end
 function GetLanguages()
 	return langs
 end
+
+for _, language in pairs(Language) do
+	language.SETTINGS.GridDisplay = "Display mode"
+	language.SETTINGS_DESCRIPTION.GridDisplay = "Cover layout for Library, History and manga catalogs"
+	language.SETTINGS.GridColumns = "Grid columns"
+	language.SETTINGS_DESCRIPTION.GridColumns = "3, 4 or 5 covers per row, independent of display mode"
+end
+
+local filterLabels = {
+	English = "filters", Russian = "фильтры", Turkish = "filtreler", Vietnamese = "bộ lọc",
+	Italian = "filtri", Spanish = "filtros", French = "filtres", PortugueseBR = "filtros",
+	SimplifiedChinese = "筛选", TraditionalChinese = "篩選", Romanian = "filtre",
+	Polish = "filtry", German = "filter", Japanese = "フィルター"
+}
+for name, language in pairs(Language) do
+	if name ~= "Default" then
+		language.PANEL.FILTERS = filterLabels[name] or "filters"
+		language.PANEL.MODE = language.PANEL.FILTERS
+	end
+end

@@ -12,6 +12,17 @@ local readFile = System.readFile
 local sizeFile = System.sizeFile
 local doesFileExist = System.doesFileExist
 local doesDirExist = System.doesDirExist
+local cachedList, cachedSorting
+local externalStorage
+
+-- Called on library entry and periodically by the catalog, rather than for every draw.
+function Database.refreshStorage()
+	local available = doesDirExist("uma0:data/noboru")
+	if available ~= externalStorage then
+		externalStorage = available
+		cachedList = nil
+	end
+end
 
 ---@param Manga table
 ---@return string
@@ -23,8 +34,10 @@ end
 ---@return table
 ---Gets Library manga list
 function Database.getMangaList()
+	if externalStorage == nil then Database.refreshStorage() end
+	if cachedList and cachedSorting == Settings.LibrarySorting then return cachedList end
 	local mangaList = {}
-	local uma0_flag = doesDirExist("uma0:data/noboru")
+	local uma0_flag = externalStorage
 	for i = 1, #database do
 		local m = database[i]
 		if m.Location ~= "uma0" or uma0_flag then
@@ -46,7 +59,8 @@ function Database.getMangaList()
 			end
 		)
 	end
-	return mangaList
+	cachedList, cachedSorting = mangaList, Settings.LibrarySorting
+	return cachedList
 end
 
 ---@param manga table
@@ -91,6 +105,7 @@ end
 
 ---Saves library to `ux0:data/noboru/save.dat`
 function Database.save()
+	cachedList = nil
 	local mangaTable = {}
 	for k = 1, #database do
 		local m = database[k]
@@ -120,7 +135,8 @@ function Database.load()
 			database = loadDataFunction() or {}
 		end
 	end
-	Database.save()
+	cachedList = nil
+	Database.refreshStorage()
 end
 
 ---Resets library

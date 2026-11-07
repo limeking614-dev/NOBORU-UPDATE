@@ -23,12 +23,14 @@ loadlib("selector")
 loadlib("console")
 loadlib("language")
 loadlib("themes")
+loadlib("ui")
 loadlib("webtoonlang")
 loadlib("loading")
 loadlib("adbypass")
 loadlib("net")
 loadlib("parserhandler")
 loadlib("settings")
+loadlib("grid")
 loadlib("database")
 loadlib("parser")
 loadlib("catalogs")
@@ -96,9 +98,9 @@ local function preloadData()
 		if Settings.Language == "Vietnamese" then
 			loadFontString = loadFontString .. '\nĂăÂâĐđÊê\nÔôƠơƯư\nÁáÀàẢảÃãẠạĂăẮắẰằẲẳẴẵẶặÂâẤấẦầẨ\nẩẪẫẬậĐđÉéÈèẺẻẼẽẸẹÊêẾếỀ\nềỂểỄễỆệÍíÌìỈỉĨĩỊịÓóÒò\nỎỏÕõỌọÔôỐốỒồỔổỖỗỘộƠ\nơỚớỜờỞởỠỡỢợÚúÙùỦủ\nŨũỤụƯưỨứỪừỬửỮữỰựÝýỲỳỶỷỸ\nỹỴỵ' --to disable lag for vietnamese (very slow loading)
 		end
-		for langName, _ in pairs(Language) do
-			loadFontString = loadFontString .. (LanguageNames and LanguageNames[langName] and LanguageNames[langName][langName] or "")
-		end
+		-- Other scripts load on demand; warming every language forces all fallback faces into RAM.
+		local names = LanguageNames and LanguageNames[Settings.Language]
+		loadFontString = loadFontString .. (names and names[Settings.Language] or "")
 		for k, v in ipairs(fonts) do
 			coroutine.yield("Loading fonts " .. k .. "/" .. #fonts)
 			Font.print(v, 0, 0, loadFontString, COLOR_BLACK)
@@ -150,29 +152,26 @@ local is_touch_locked = false
 local LoadingTimer = Timer.new()
 
 local f = coroutine.create(preloadData)
+local loadingText, loadingProgress = "Loading settings", nil
 while coroutine.status(f) ~= "dead" do
 	Graphics.initBlend()
 	Screen.clear()
-	local _, text, prog
 	Timer.reset(LoadingTimer)
 	repeat
-		_, text, prog = coroutine.resume(f)
-	until Timer.getTime(LoadingTimer) > 8
-	if not _ then
-		Console.error(text)
+		local ok, text, progress = coroutine.resume(f)
+		if not ok then Console.error(text); break end
+		if text then loadingText, loadingProgress = text, progress end
+	until Timer.getTime(LoadingTimer) > 8 or coroutine.status(f) == "dead"
+	Font.print(FONT16, 480 - Font.getTextWidth(FONT16, loadingText) / 2, 368, loadingText, Color.new(100, 100, 100))
+	if loadingProgress and not Settings.SkipCacheChapterChecking then
+		local progress = math.max(0, math.min(1, loadingProgress))
+		Graphics.fillRect(150, 810, 400, 403, Color.new(100, 100, 100))
+		Graphics.fillRect(150, 150 + 660 * progress, 400, 403, COLOR_WHITE)
 	end
-	if text then
-		Font.print(FONT16, 960 / 2 - Font.getTextWidth(FONT16, text) / 2, 272 + 172 / 2 + 10, text, Color.new(100, 100, 100))
-	end
-	if prog and not Settings.SkipCacheChapterChecking then
-		Graphics.fillRect(150, 150 + 660, 272 + 172 / 2 + 42, 272 + 172 / 2 + 45, Color.new(100, 100, 100))
-		Graphics.fillRect(150, 150 + 660 * prog, 272 + 172 / 2 + 42, 272 + 172 / 2 + 45, COLOR_WHITE)
-	end
-	if logo then
-		Graphics.drawImage(480 - 666 / 2, 272 - 172 / 2, logo.e)
-	end
+	if logo then Graphics.drawImage(480 - 666 / 2, 272 - 172 / 2, logo.e) end
 	Graphics.termBlend()
 	Screen.flip()
+	Screen.waitVblankStart()
 end
 Timer.destroy(LoadingTimer)
 
@@ -189,8 +188,10 @@ if Controls.check(pad, SCE_CTRL_SELECT) then
 end
 
 local fade = 1
+local launchFadeTimer = Timer.new()
 
 local function input()
+	UI.update()
 	oldPad, pad = pad, Controls.read()
 	oldTouch.x, oldTouch.y, oldTouch2.x, oldTouch2.y, touch.x, touch.y, touch2.x, touch2.y = touch.x, touch.y, touch2.x, touch2.y, Controls.readTouch()
 
@@ -258,10 +259,7 @@ local function update()
 		Changes.update()
 	end
 	if fade > 0 then
-		fade = fade - fade / 8
-		if fade < 1 / 254 then
-			fade = 0
-		end
+		fade = UI.transition(1, 0, launchFadeTimer, UI.motion.dialog)
 	end
 	if AppMode == MENU then
 		Menu.update()

@@ -27,7 +27,7 @@ local EXTRA_MENU_READER = {"OpenInBrowser", "ReaderWebtoon", "ReaderOrientation"
 local EXTRA_MENU_READER_IMPORTED = {--[["OpenInBrowser",]] "ReaderWebtoon", "ReaderOrientation", "ReaderDirection", "ZoomReader", "DownloadImageToMemory"}
 
 local fade = 0
-local oldFade = 1
+local fadeFrom = 0
 local maxExtraMenuWidth = 0
 local extraMenuYDrawStart = 0
 
@@ -42,7 +42,7 @@ local extraSelector =
 	0,
 	0,
 	function()
-		return math.floor((slider.Y + extraMenuYDrawStart) / 80)
+		return math.floor((slider.Y + extraMenuYDrawStart) / 64)
 	end
 )
 
@@ -50,33 +50,30 @@ local extraSelector =
 local function updateScrolling()
 	local selectedItem = extraSelector.getSelected()
 	if selectedItem ~= 0 then
-		slider.Y = slider.Y + (selectedItem * 80 - 272 - slider.Y) / 8
+		slider.Y = UI.approach(slider.Y, selectedItem * 64 - 272, UI.motion.scroll)
 	end
-	slider.Y = slider.Y + slider.V
-	slider.V = slider.V / 1.12
+	local decay = math.pow(1 / 1.12, UI.dt / (1000 / 60))
+	slider.Y = slider.Y + slider.V * (1 - decay) / (1 - 1 / 1.12)
+	slider.V = slider.V * decay
 	if math.abs(slider.V) < 0.1 then
 		slider.V = 0
 	end
 	if slider.Y < 0 then
 		slider.Y = 0
 		slider.V = 0
-	elseif slider.Y > #selectedExtraMenu * 80 - 544 then
-		slider.Y = math.max(0, #selectedExtraMenu * 80 - 544)
+	elseif slider.Y > #selectedExtraMenu * 64 - 544 then
+		slider.Y = math.max(0, #selectedExtraMenu * 64 - 544)
 		slider.V = 0
 	end
 end
 
-local easingFunction = EaseInOutCubic
-
 ---Updates animation of fade in or out
 local function animationUpdate()
 	if status == "START" then
-		fade = easingFunction(math.min((Timer.getTime(fadeAnimationTimer) / 500), 1))
+		fade = UI.transition(fadeFrom, 1, fadeAnimationTimer, UI.motion.enter)
 	elseif status == "WAIT" then
-		if fade == 0 then
-			status = "END"
-		end
-		fade = 1 - easingFunction(math.min((Timer.getTime(fadeAnimationTimer) / 500), 1))
+		fade = UI.transition(fadeFrom, 0, fadeAnimationTimer, UI.motion.exit)
+		if fade == 0 then status = "END" end
 	end
 end
 
@@ -86,12 +83,14 @@ function Extra.setChapters(manga, chapters, page)
 	if manga then
 		mode = "setChapters"
 		selectedManga = manga
+		selectedPage = page
 		chaptersList = chapters
 		status = "START"
-		oldFade = 1
 		was_bookmarks_updated = false
 
 		slider.Y = -50
+		slider.V = 0
+		TOUCH_MODES.MODE = TOUCH_MODES.NONE
 		if page then
 			if manga.ParserID == "IMPORTED" then
 				selectedExtraMenu = EXTRA_MENU_READER_IMPORTED
@@ -110,13 +109,14 @@ function Extra.setChapters(manga, chapters, page)
 			end
 		end
 		extraSelector:resetSelected()
+		fadeFrom = fade
 		Timer.reset(fadeAnimationTimer)
-		extraMenuYDrawStart = 272 - #selectedExtraMenu * 80 / 2
+		extraMenuYDrawStart = 272 - #selectedExtraMenu * 64 / 2 + 12
 		maxExtraMenuWidth = DEFAULT_MAX_EXTRA_MENU_WIDTH
 		for i = 1, #selectedExtraMenu do
 			local extraOptionTextWidth = Font.getTextWidth(BONT16, Language[Settings.Language].EXTRA[selectedExtraMenu[i]] or selectedExtraMenu[i]) + 40
 			if extraOptionTextWidth > maxExtraMenuWidth then
-				maxExtraMenuWidth = extraOptionTextWidth
+				maxExtraMenuWidth = math.min(720, extraOptionTextWidth)
 			end
 		end
 	end
@@ -152,10 +152,10 @@ function Extra.setLanguage()
 	selectedExtraMenu = {}
 	langToCode = {}
 	status = "START"
-	oldFade = 1
 	slider.Y = -50
 	updateLanguagePick()
 	extraSelector:resetSelected()
+	fadeFrom = fade
 	Timer.reset(fadeAnimationTimer)
 	extraMenuYDrawStart = 0
 	maxExtraMenuWidth = DEFAULT_MAX_EXTRA_MENU_WIDTH
@@ -424,19 +424,23 @@ end
 
 function Extra.input(oldPad, pad, oldTouch, touch)
 	if status == "START" then
-		if TOUCH_MODES.MODE == TOUCH_MODES.NONE and oldTouch.x and touch.x and touch.x > 240 then
+		if TOUCH_MODES.MODE == TOUCH_MODES.NONE and oldTouch.x and touch.x and touch.x > 480 - maxExtraMenuWidth / 2 then
 			TOUCH_MODES.MODE = TOUCH_MODES.READ
 			slider.TouchY = touch.y
 		elseif TOUCH_MODES.MODE ~= TOUCH_MODES.NONE and not touch.x then
 			if TOUCH_MODES.MODE == TOUCH_MODES.READ and oldTouch.x then
-				if oldTouch.x > 480 - maxExtraMenuWidth / 2 and oldTouch.x < 480 + maxExtraMenuWidth / 2 and oldTouch.y > extraMenuYDrawStart and oldTouch.y < extraMenuYDrawStart + #selectedExtraMenu * 80 then
-					local id = math.floor((slider.Y + oldTouch.y - extraMenuYDrawStart) / 80) + 1
+				if oldTouch.x > 480 - maxExtraMenuWidth / 2 and oldTouch.x < 480 + maxExtraMenuWidth / 2 and oldTouch.y > extraMenuYDrawStart and oldTouch.y < extraMenuYDrawStart + #selectedExtraMenu * 64 then
+					local id = math.floor((slider.Y + oldTouch.y - extraMenuYDrawStart) / 64) + 1
 					pressOption(id)
 					if mode == "setLanguage" then
 						if mode == "setLanguage" then
 							updateLanguagePick()
 						end
 					end
+				elseif mode == "setChapters" and oldTouch.x > 480 - maxExtraMenuWidth / 2 and oldTouch.x < 480 + maxExtraMenuWidth / 2 and oldTouch.y >= extraMenuYDrawStart + #selectedExtraMenu * 64 and oldTouch.y <= extraMenuYDrawStart + #selectedExtraMenu * 64 + 28 then
+					status = "WAIT"
+					fadeFrom = fade
+					Timer.reset(fadeAnimationTimer)
 				end
 			end
 			TOUCH_MODES.MODE = TOUCH_MODES.NONE
@@ -450,18 +454,18 @@ function Extra.input(oldPad, pad, oldTouch, touch)
 			end
 		elseif Controls.check(pad, SCE_CTRL_CIRCLE) and not Controls.check(oldPad, SCE_CTRL_CIRCLE) then
 			status = "WAIT"
+			fadeFrom = fade
 			Timer.reset(fadeAnimationTimer)
-			oldFade = fade
 		elseif Controls.check(pad, SCE_CTRL_START) and not Controls.check(oldPad, SCE_CTRL_START) then
 			status = "WAIT"
+			fadeFrom = fade
 			Timer.reset(fadeAnimationTimer)
-			oldFade = fade
 		elseif touch.x ~= nil and oldTouch.x == nil then
-			if touch.x > 480 - maxExtraMenuWidth / 2 and touch.x < 480 + maxExtraMenuWidth / 2 and touch.y > extraMenuYDrawStart and touch.y < extraMenuYDrawStart + 80 * #selectedExtraMenu then
+			if touch.x > 480 - maxExtraMenuWidth / 2 and touch.x < 480 + maxExtraMenuWidth / 2 and touch.y > (mode == "setChapters" and extraMenuYDrawStart - 52 or extraMenuYDrawStart) and touch.y < extraMenuYDrawStart + 64 * #selectedExtraMenu + (mode == "setChapters" and 28 or 0) then
 			else
 				status = "WAIT"
+				fadeFrom = fade
 				Timer.reset(fadeAnimationTimer)
-				oldFade = fade
 			end
 		end
 		local newItemID = 0
@@ -470,7 +474,7 @@ function Extra.input(oldPad, pad, oldTouch, touch)
 				TOUCH_MODES.MODE = TOUCH_MODES.SLIDE
 			else
 				if oldTouch.x > 480 - maxExtraMenuWidth / 2 and oldTouch.x < 480 + maxExtraMenuWidth / 2 then
-					local id = math.floor((slider.Y + oldTouch.y - extraMenuYDrawStart) / 80) + 1
+					local id = math.floor((slider.Y + oldTouch.y - extraMenuYDrawStart) / 64) + 1
 					if selectedExtraMenu[id] then
 						newItemID = id
 					end
@@ -478,7 +482,7 @@ function Extra.input(oldPad, pad, oldTouch, touch)
 			end
 		elseif TOUCH_MODES.MODE == TOUCH_MODES.SLIDE then
 			if touch.x and oldTouch.x then
-				slider.V = oldTouch.y - touch.y
+				slider.V = (oldTouch.y - touch.y) * (1000 / 60) / UI.dt
 			end
 		end
 		if slider.ItemID > 0 and newItemID > 0 and slider.ItemID ~= newItemID then
@@ -497,49 +501,56 @@ function Extra.update()
 end
 
 function Extra.draw()
-	if status ~= "END" then
-		local M = oldFade * fade
-		local Alpha = 255 * M
-		local start = math.max(1, math.floor(slider.Y / 80) + 1)
-		local shift = (1 - M) * 544
-		local whiteColor = Color.new(255, 255, 255, Alpha)
-		local blackColor = Color.new(0, 0, 0, Alpha)
-		local y = shift - slider.Y + start * 80 + extraMenuYDrawStart
-		local optionsListCount = #selectedExtraMenu
-		Graphics.fillRect(0, 960, 0, 544, Color.new(0, 0, 0, 150 * M))
-		Graphics.fillRect(480 - maxExtraMenuWidth / 2, 480 + maxExtraMenuWidth / 2, extraMenuYDrawStart + shift, extraMenuYDrawStart + 80 * optionsListCount + shift - 1, whiteColor)
-		for i = start, math.min(optionsListCount, start + 8) do
-			local optionText = Language[Settings.Language].SETTINGS[selectedExtraMenu[i]] or Language[Settings.Language].EXTRA[selectedExtraMenu[i]] or selectedExtraMenu[i]
-			if selectedExtraMenu[i] == "ReaderWebtoon" then
-				optionText = optionText .. ": " .. (Language[Settings.Language].READER[customSettings.ReaderView or "Default"] or customSettings.ReaderView)
-			elseif selectedExtraMenu[i] == "ReaderOrientation" then
-				optionText = optionText .. ": " .. Language[Settings.Language].READER[customSettings.Orientation]
-			elseif selectedExtraMenu[i] == "ReaderDirection" then
-				optionText = optionText .. ": " .. Language[Settings.Language].READER[customSettings.ReaderDirection]
-			elseif selectedExtraMenu[i] == "ZoomReader" then
-				optionText = optionText .. ": " .. Language[Settings.Language].READER[customSettings.ZoomReader]
-			end
-			Font.print(BONT16, 480 - Font.getTextWidth(BONT16, optionText) / 2, y + 28 - 79, optionText, blackColor)
-			if i == slider.ItemID then
-				Graphics.fillRect(480 - maxExtraMenuWidth / 2, 480 + maxExtraMenuWidth / 2, y - 79, y, Color.new(0, 0, 0, 24 * M))
-			end
-			y = y + 80
+	if status == "END" then return end
+	local M = fade
+	local shift = (1 - M) * 20
+	local count = #selectedExtraMenu
+	local width = math.min(720, math.max(DEFAULT_MAX_EXTRA_MENU_WIDTH, maxExtraMenuWidth))
+	local left, right = 480 - width / 2, 480 + width / 2
+	local top = mode == "setChapters" and extraMenuYDrawStart - 52 or 0
+	local bottom = mode == "setChapters" and extraMenuYDrawStart + count * 64 + 28 or 544
+	Graphics.fillRect(0, 960, 0, 544, UI.color("OVERLAY", 0.6 * M))
+	UI.fillRoundRect(left - 8, right + 8, top + shift, bottom + shift, 14, UI.color("SURFACE", M))
+	UI.roundBorder(left - 8, right + 8, top + shift, bottom + shift, 14, 1, UI.color("BORDER", M))
+	local start = math.max(1, math.floor(slider.Y / 64) + 1)
+	local selected = extraSelector:getSelected()
+	for i = start, math.min(count, start + 9) do
+		local y = extraMenuYDrawStart + (i - 1) * 64 - slider.Y + shift
+		if y >= 544 then break end
+		local option = selectedExtraMenu[i]
+		local label = Language[Settings.Language].SETTINGS[option] or Language[Settings.Language].EXTRA[option] or option
+		if option == "ReaderWebtoon" then
+			label = label .. ": " .. (Language[Settings.Language].READER[customSettings.ReaderView or "Default"] or customSettings.ReaderView)
+		elseif option == "ReaderOrientation" then
+			label = label .. ": " .. Language[Settings.Language].READER[customSettings.Orientation]
+		elseif option == "ReaderDirection" then
+			label = label .. ": " .. Language[Settings.Language].READER[customSettings.ReaderDirection]
+		elseif option == "ZoomReader" then
+			label = label .. ": " .. Language[Settings.Language].READER[customSettings.ZoomReader]
 		end
-		local item = extraSelector.getSelected()
-		if item ~= 0 then
-			y = shift - slider.Y + (item - 1) * 80 + extraMenuYDrawStart
-			local selectedRedColor = Color.new(255, 255, 255, 100 * M * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
-			local ks = math.ceil(2 * math.sin(Timer.getTime(GlobalTimer) / 100))
-			for i = ks, ks + 1 do
-				Graphics.fillEmptyRect(480 - maxExtraMenuWidth / 2 + i + 3, 480 + maxExtraMenuWidth / 2 - i - 2, y + i + 3, y + 75 - i + 2, Themes[Settings.Theme].COLOR_SELECTOR)
-				Graphics.fillEmptyRect(480 - maxExtraMenuWidth / 2 + i + 3, 480 + maxExtraMenuWidth / 2 - i - 2, y + i + 3, y + 75 - i + 2, selectedRedColor)
-			end
-		end
-		if #selectedExtraMenu > 6 then
-			Graphics.fillRect(480 + maxExtraMenuWidth / 2, 480 + maxExtraMenuWidth / 2 + 10, 0 + shift, 544 + shift, whiteColor)
-			local h = #selectedExtraMenu * 80 / 540
-			Graphics.fillRect(480 + maxExtraMenuWidth / 2 + 2, 480 + maxExtraMenuWidth / 2 + 8, 2 + (slider.Y) / h + shift, 2 + (slider.Y + 544) / h + shift, blackColor)
-		end
+		local active = selected == i or slider.ItemID == i
+		UI.fillRoundRect(left + 8, right - 8, y + 5, y + 59, 10, UI.color(active and "SELECTED" or "BACK", M))
+		local dangerous = option == "RemoveAll" or option == "ClearBookmarks" or option == "CancelAll"
+		Font.print(BONT16, left + 26, y + 32 - Font.getTextHeight(BONT16, label) / 2, FitText(BONT16, label, width - 64), UI.color(dangerous and "DANGER" or "FONT", M))
+		if selected == i then UI.focusBorder(left + 8, right - 8, y + 5, y + 59, 10, M) end
+	end
+	if mode == "setChapters" then
+		UI.fillRoundRect(left - 8, right + 8, top + shift, extraMenuYDrawStart + shift - 2, 14, UI.color("SURFACE", M))
+		local heading = selectedPage and "reader options" or "chapter options"
+		Font.print(FONT20, left + 18, top + 7 + shift, UI.capitalize(heading), UI.color("FONT", M))
+		Font.print(FONT16, left + 18, top + 32 + shift, FitText(FONT16, UI.capitalize(selectedManga.Name), width - 36), UI.color("SUBFONT", M))
+		Graphics.fillRect(left + 18, right - 18, extraMenuYDrawStart + shift - 2, extraMenuYDrawStart + shift - 1, UI.color("BORDER", M))
+		local button = Settings.KeyType == "JP" and ButtonsIcons.Cross or ButtonsIcons.Circle
+		Graphics.drawImage(left + 18, bottom - 20 + shift, button.e, Color.new(255, 255, 255, 255 * M))
+		Font.print(FONT16, left + 42, bottom - 22 + shift, UI.capitalize(Language[Settings.Language].PANEL.BACK or "back"), UI.color("SUBFONT", M))
+		local closeX = right - 18 - Font.getTextWidth(FONT16, "close")
+		Graphics.drawImage(closeX - 10 - ButtonsIcons.Start.Width, bottom - 20 + shift, ButtonsIcons.Start.e, Color.new(255, 255, 255, 255 * M))
+		Font.print(FONT16, closeX, bottom - 22 + shift, "Close", UI.color("SUBFONT", M))
+	end
+	if count * 64 > 544 then
+		local thumb = 544 * 544 / (count * 64)
+		local y = (544 - thumb) * slider.Y / (count * 64 - 544)
+		UI.roundRect(right + 2, right + 6, y, y + thumb, UI.color("SUBFONT", M))
 	end
 end
 
@@ -548,5 +559,5 @@ function Extra.getStatus()
 end
 
 function Extra.getFade()
-	return fade * oldFade
+	return fade
 end

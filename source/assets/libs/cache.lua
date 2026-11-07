@@ -246,7 +246,6 @@ function Cache.loadHistory()
 			history = loadHistoryFunction() or {}
 		end
 	end
-	Cache.saveHistory()
 	is_history_updated = true
 end
 
@@ -330,6 +329,7 @@ end
 ---Loads Cache
 function Cache.load()
 	data = {}
+	local changed = false
 	if doesFileExist(CACHE_INFO_PATH) then
 		local fh = openFile(CACHE_INFO_PATH, FREAD)
 		local loadCacheFunction = load(readFile(fh, sizeFile(fh)))
@@ -354,6 +354,7 @@ function Cache.load()
 						end
 						data[k] = v
 					else
+						changed = true
 						Notifications.push("cache_error\n" .. k)
 					end
 				else
@@ -364,7 +365,7 @@ function Cache.load()
 		end
 		closeFile(fh)
 	end
-	Cache.save()
+	if changed then Cache.save() end
 end
 
 ---Saves Cache

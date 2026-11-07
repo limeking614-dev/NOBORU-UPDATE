@@ -63,15 +63,7 @@ SCE_RIGHT_STICK_SENSITIVITY = 1
 SCE_CTRL_REAL_CROSS = SCE_CTRL_CROSS
 SCE_CTRL_REAL_CIRCLE = SCE_CTRL_CIRCLE
 
-FONT16 = Font.load("app0:roboto.ttf")
-FONT20 = Font.load("app0:roboto.ttf")
-FONT26 = Font.load("app0:roboto.ttf")
-BONT16 = Font.load("app0:robboto.ttf")
-BONT30 = Font.load("app0:robboto.ttf")
-
-Font.setPixelSizes(FONT20, 20)
-Font.setPixelSizes(FONT26, 26)
-Font.setPixelSizes(BONT30, 30)
+loadlib("fonts")
 
 local doesDirExist = System.doesDirExist
 local createDirectory = System.createDirectory
@@ -228,92 +220,54 @@ end
 
 local isCJK = IsCJK
 
-local function drawMangaName(Manga)
-	Manga.PrintName = {}
-	local width = Font.getTextWidth(FONT16, Manga.Name)
-	if width < MANGA_WIDTH - 20 then
-		Manga.PrintName.s = Manga.Name
-	else
-		local f, s = {}, {}
-		local tf = false
-		for c in it_utf8(Manga.Name) do
-			if tf and Font.getTextWidth(FONT16, table.concat(s)) > MANGA_WIDTH - 40 then
-				s[#s] = "…"
-				if Font.getTextWidth(FONT16, table.concat(s)) > MANGA_WIDTH - 40 then
-					s[#s] = nil
-					s[#s] = "…"
-				end
-				break
-			elseif tf then
-				s[#s + 1] = c
-			elseif not tf and Font.getTextWidth(FONT16, table.concat(f)) > MANGA_WIDTH - 30 then
-				if isCJK(f[#f]) then
-					s[#s + 1] = f[#f]
-					f[#f] = nil
-				else
-					f = table.concat(f)
-					local cut = f:match(".+%s(.-)$") or f:match(".+-(.-)$") or f
-					for k in it_utf8(cut) do
-						s[#s + 1] = k
-					end
-					s[#s + 1] = c
-					f = f:match("^(.+)%s.-$") or f:match("(.+-).-$") or ""
-				end
-				tf = true
-			elseif not tf then
-				f[#f + 1] = c
+local function drawMangaName(Manga, width)
+	local available = width - 16
+	local chars = {}
+	for char in it_utf8(Manga.Name) do chars[#chars + 1] = char end
+	local lines, index = {}, 1
+	for row = 1, 2 do
+		local line = ""
+		while index <= #chars and Font.getTextWidth(BONT16, line .. chars[index]) <= available do
+			line, index = line .. chars[index], index + 1
+		end
+		if row == 1 and index <= #chars then
+			local head, tail = line:match("^(.*)%s+([^%s]+)$")
+			if head and head ~= "" then
+				for _ in it_utf8(tail) do index = index - 1 end
+				line = head
 			end
 		end
-		if type(s) == "table" then
-			s = table.concat(s)
-		end
-		if type(f) == "table" then
-			f = table.concat(f)
-		end
-		s = s:gsub("^(%s+)", "")
-		if s == "" then
-			s, f = f, ""
-		end
-		Manga.PrintName.f = f or ""
-		Manga.PrintName.s = s
+		lines[row] = line:gsub("^%s+", ""):gsub("%s+$", "")
+		while chars[index] and chars[index]:match("%s") do index = index + 1 end
+		if index > #chars then break end
 	end
+	if index <= #chars then
+		local last = {}
+		for char in it_utf8(lines[2] or "") do last[#last + 1] = char end
+		while #last > 0 and Font.getTextWidth(BONT16, table.concat(last) .. "…") > available do last[#last] = nil end
+		lines[2] = table.concat(last) .. "…"
+	end
+	Manga.PrintNameWidth = width
+	Manga.PrintName = { f = #lines > 1 and lines[1] or nil, s = lines[#lines] or "" }
 end
 
-function DrawManga(x, y, Manga)
-	if Manga.Image and Manga.Image.e then
-		Graphics.fillRect(x - MANGA_WIDTH / 2, x + MANGA_WIDTH / 2, y - MANGA_HEIGHT / 2, y + MANGA_HEIGHT / 2, Color.new(0, 0, 0))
-		local width, height = Manga.Image.Width, Manga.Image.Height
-		local was_drawn = false
-		if width < height then
-			local scale = MANGA_WIDTH / width
-			local h = MANGA_HEIGHT / scale
-			local s_y = (height - h) / 2
-			if s_y >= 0 then
-				Graphics.drawImageExtended(x, y, Manga.Image.e, 0, s_y, width, h, 0, scale, scale)
-				was_drawn = true
-			end
-		end
-		if not was_drawn then
-			local scale = MANGA_HEIGHT / height
-			local w = MANGA_WIDTH / scale
-			local s_x = (width - w) / 2
-			Graphics.drawImageExtended(x, y, Manga.Image.e, s_x, 0, w, height, 0, scale, scale)
-		end
-	else
-		Graphics.fillRect(x - MANGA_WIDTH / 2, x + MANGA_WIDTH / 2, y - MANGA_HEIGHT / 2, y + MANGA_HEIGHT / 2, COLOR_COVER)
-	end
-	Graphics.drawScaleImage(x - MANGA_WIDTH / 2, y + MANGA_HEIGHT / 2 - 120, LUA_GRADIENT.e, MANGA_WIDTH, 1)
+function DrawManga(x, y, Manga, width, height, coverOnly, titlesBelow)
+	width, height = width or MANGA_WIDTH, height or MANGA_HEIGHT
+	DrawDetailsManga(x, y, Manga, width / MANGA_WIDTH)
+	if coverOnly then return end
+	if not titlesBelow then Graphics.drawScaleImage(x - width / 2, y + height / 2 - 120, LUA_GRADIENT.e, width, 1) end
 	if Manga.Name then
-		if not Manga.PrintName then
-			pcall(drawMangaName, Manga)
-		else
-			if Manga.PrintName.f then
-				if y + MANGA_HEIGHT / 2 - 47 < 544 and y + MANGA_HEIGHT / 2 - 47 > -16 then
-					Font.print(BONT16, x - MANGA_WIDTH / 2 + 8, y + MANGA_HEIGHT / 2 - 47, Manga.PrintName.f, COLOR_WHITE)
-				end
+		if not Manga.PrintName or Manga.PrintNameWidth ~= width then pcall(drawMangaName, Manga, width) end
+		if Manga.PrintName then
+			local top = y + height / 2
+			local firstY = titlesBelow and top + 7 or top - 47
+			local secondY = titlesBelow and (Manga.PrintName.f and top + 27 or top + 7) or top - 27
+			local color = titlesBelow and COLOR_FONT or COLOR_WHITE
+			if Manga.PrintName.f and firstY < 544 and firstY > -16 then
+				Font.print(BONT16, x - width / 2 + 8, firstY, Manga.PrintName.f, color)
 			end
-			if y + MANGA_HEIGHT / 2 - 27 < 544 and y + MANGA_HEIGHT / 2 - 27 > -16 then
-				Font.print(BONT16, x - MANGA_WIDTH / 2 + 8, y + MANGA_HEIGHT / 2 - 27, Manga.PrintName.s, COLOR_WHITE)
+			if secondY < 544 and secondY > -16 then
+				Font.print(BONT16, x - width / 2 + 8, secondY, Manga.PrintName.s, color)
 			end
 		end
 	end

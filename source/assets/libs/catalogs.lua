@@ -22,16 +22,80 @@ local currentParser = nil
 local touchTimer = Timer.new()
 
 local status = "CATALOGS"
+local function isGrid()
+	return status == "MANGA" or status == "LIBRARY" or status == "HISTORY"
+end
+
+local function gridTop()
+	return isGrid() and 64 or 6
+end
+
+local function gridY(index)
+	local layout = Grid.layout()
+	return floor((index - 1) / layout.columns) * layout.stride - slider.Y + gridTop()
+end
+
 local keyboardMode = "NONE"
 local downloadBarValue = 0
 
 local downloadedImages = {}
 local page = 1
 local currentMangaList = {}
+local function gridLimit()
+	local layout = Grid.layout()
+	return max(0, ceil(#currentMangaList / layout.columns) * layout.stride + gridTop() - layout.gap - 524)
+end
 local parsersList = {}
 
 local chaptersFolderSize
 local cacheFolderSize
+local folderSizeRequests = {}
+local folderSizeTask
+local folderSizeKind
+local storageTimer = Timer.new()
+
+local function cancelFolderSizeScan()
+	folderSizeTask, folderSizeKind, folderSizeRequests = nil, nil, {}
+end
+
+-- Directory enumeration belongs in updates. Yield after each directory and entry
+-- so a large collection cannot monopolize a frame while drawing Settings.
+local function updateFolderSizes()
+	if not folderSizeTask then
+		local kind = next(folderSizeRequests)
+		if not kind then return end
+		folderSizeKind = kind
+		folderSizeRequests[kind] = nil
+		folderSizeTask = coroutine.create(function()
+			local total = 0
+			local function scan(path)
+				local entries = listDirectory(path) or {}
+				coroutine.yield()
+				for _, entry in ipairs(entries) do
+					if entry.directory then scan(path .. "/" .. entry.name)
+					else total = total + (entry.size or 0) end
+					coroutine.yield()
+				end
+			end
+			scan("ux0:data/noboru/" .. kind)
+			if kind == "chapters" and doesDirExist("uma0:data/noboru/chapters") then
+				scan("uma0:data/noboru/chapters")
+			end
+			if kind == "chapters" then chaptersFolderSize = total else cacheFolderSize = total end
+		end)
+	end
+	-- A fixed work limit also works on runtimes with coarse timer resolution.
+	for _ = 1, 16 do
+		local ok, err = coroutine.resume(folderSizeTask)
+		if not ok then Console.error(err) end
+		if not ok or coroutine.status(folderSizeTask) == "dead" then
+			folderSizeRequests[folderSizeKind] = nil
+			folderSizeKind = nil
+			folderSizeTask = nil
+			break
+		end
+	end
+end
 local sure_clear_library
 local sure_clear_chapters
 local sure_clear_all_cache
@@ -48,9 +112,21 @@ local mangaSelector =
 	-1,
 	1,
 	function()
-		return max(1, floor((slider.Y - 20) / (MANGA_HEIGHT + 12)) * 4 + 1)
+		return Grid.first(slider.Y)
 	end
 )
+
+local lastGridLayout = Grid.layout()
+local function syncGridLayout()
+	local layout = Grid.layout()
+	if layout ~= lastGridLayout then
+		slider.Y, slider.V = 0, 0
+		mangaSelector:resetSelected()
+		TOUCH_MODES.MODE = TOUCH_MODES.NONE
+		lastGridLayout = layout
+	end
+	mangaSelector:setSteps(-layout.columns, layout.columns, -1, 1)
+end
 
 local parserSelector =
 	Selector:new(
@@ -339,6 +415,7 @@ local function pcDeleteAllSources()
 	end)
 	cacheFolderSize = nil
 	chaptersFolderSize = nil
+	cancelFolderSizeScan()
 	Notifications.push("Added sources deleted (" .. removed .. " saved items removed)")
 end
 
@@ -348,6 +425,7 @@ local function freeMangaImage(manga)
 		if manga.Image and manga.Image.free then
 			manga.Image:free()
 		end
+		manga.Image, manga.newImage = nil, nil
 		manga.ImageDownload = nil
 	end
 end
@@ -355,7 +433,7 @@ end
 local function loadMangaImage(manga)
 	if CustomCovers.hasCustomCover(manga) then
 		local customCoverPath = "ux0:data/noboru/cache/" .. Cache.getKey(manga) .. "/custom_cover.image"
-		if doesFileExist(customCoverPath) and System.getPictureResolution(customCoverPath) or -1 > 0 then
+		if doesFileExist(customCoverPath) and (System.getPictureResolution(customCoverPath) or 0) > 0 then
 			Threads.addTask(
 				manga,
 				{
@@ -469,7 +547,7 @@ local function loadMangaImage(manga)
 		end
 	else
 		local path = manga.Path or ("cache/" .. Cache.getKey(manga) .. "/cover.image")
-		if path and doesFileExist("ux0:data/noboru/" .. path) and System.getPictureResolution("ux0:data/noboru/" .. path) or -1 > 0 then
+		if path and doesFileExist("ux0:data/noboru/" .. path) and (System.getPictureResolution("ux0:data/noboru/" .. path) or 0) > 0 then
 			Threads.addTask(
 				manga,
 				{
@@ -512,39 +590,29 @@ local function loadMangaImage(manga)
 end
 
 local function UpdateMangas()
-	if slider.V == 0 and Timer.getTime(touchTimer) > 200 then
-		local start = max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
-		if #downloadedImages > 12 then
-			local newTable = {}
-			for _, i in ipairs(downloadedImages) do
-				if i < start or i > min(#currentMangaList, start + 11) then
-					freeMangaImage(currentMangaList[i])
-				else
-					newTable[#newTable + 1] = i
-				end
-			end
-			downloadedImages = newTable
+	local start = Grid.first(slider.Y)
+	local capacity = Grid.capacity()
+	local columns = Grid.layout().columns
+	local keepStart = max(1, start - columns)
+	local keepEnd = min(#currentMangaList, start + capacity + columns - 1)
+	for n = #downloadedImages, 1, -1 do
+		local i = downloadedImages[n]
+		local selected = Details.getStatus() ~= "END" and currentMangaList[i] == Details.getManga()
+		if (i < keepStart or i > keepEnd) and not selected then
+			freeMangaImage(currentMangaList[i])
+			table.remove(downloadedImages, n)
 		end
-		for i = start, min(#currentMangaList, start + 11) do
-			local manga = currentMangaList[i]
-			if not manga.ImageDownload then
-				loadMangaImage(manga)
-				manga.ImageDownload = true
-				downloadedImages[#downloadedImages + 1] = i
-			end
+	end
+	local requested = 0
+	for i = start, min(#currentMangaList, start + capacity - 1) do
+		local manga = currentMangaList[i]
+		if not manga.ImageDownload then
+			loadMangaImage(manga)
+			manga.ImageDownload = true
+			downloadedImages[#downloadedImages + 1] = i
+			requested = requested + 1
+			if requested == 2 then break end
 		end
-	else
-		local newTable = {}
-		for _, i in ipairs(downloadedImages) do
-			local manga = currentMangaList[i]
-			if Threads.check(manga) and (Details.getFade() == 0 or manga ~= Details.getManga()) then
-				Threads.remove(manga)
-				manga.ImageDownload = nil
-			else
-				newTable[#newTable + 1] = i
-			end
-		end
-		downloadedImages = newTable
 	end
 end
 
@@ -625,6 +693,7 @@ local function selectSetting(index)
 				if sure_clear_chapters == 2 then
 					SettingsFunctions[item]()
 					chaptersFolderSize = nil
+					cancelFolderSizeScan()
 					sure_clear_chapters = 0
 				end
 			elseif item == "DeleteAddedSources" then
@@ -643,6 +712,7 @@ local function selectSetting(index)
 				sure_clear_all_cache = sure_clear_all_cache + 1
 				if sure_clear_all_cache == 2 then
 					cacheFolderSize = nil
+					cancelFolderSizeScan()
 					SettingsFunctions[item]()
 					sure_clear_all_cache = 0
 				end
@@ -650,6 +720,7 @@ local function selectSetting(index)
 				sure_clear_cache = sure_clear_cache + 1
 				if sure_clear_cache == 2 then
 					cacheFolderSize = nil
+					cancelFolderSizeScan()
 					SettingsFunctions[item]()
 					sure_clear_cache = 0
 				end
@@ -701,6 +772,7 @@ pcSelector:xaction(selectPcSource)
 settingSelector:xaction(selectSetting)
 importSelector:xaction(selectImport)
 function Catalogs.input(oldpad, pad, oldtouch, touch)
+	if isGrid() then syncGridLayout() end
 	if status == "MANGA" then
 		if Controls.check(pad, SCE_CTRL_CIRCLE) and not Controls.check(oldpad, SCE_CTRL_CIRCLE) then
 			if fromPcSources then
@@ -813,18 +885,19 @@ function Catalogs.input(oldpad, pad, oldtouch, touch)
 	elseif status == "IMPORT" then
 		importSelector:input(#Import.listDir(), oldpad, pad, touch.x)
 	end
-	if TOUCH_MODES.MODE == TOUCH_MODES.NONE and oldtouch.x and touch.x and touch.x > 240 then
+	if TOUCH_MODES.MODE == TOUCH_MODES.NONE and oldtouch.x and touch.x and touch.x > 205 and touch.y >= gridTop() and touch.y < 524 then
 		TOUCH_MODES.MODE = TOUCH_MODES.READ
 		slider.TouchY = touch.y
 	elseif TOUCH_MODES.MODE ~= TOUCH_MODES.NONE and not touch.x then
 		if oldtouch.x then
 			if TOUCH_MODES.MODE == TOUCH_MODES.READ then
 				if status == "MANGA" or status == "LIBRARY" or status == "HISTORY" then
-					local start = max(1, floor((slider.Y - 20) / (MANGA_HEIGHT + 6)) * 4 + 1)
-					for i = start, min(#currentMangaList, start + 11) do
-						local lx = ((i - 1) % 4 - 2) * (MANGA_WIDTH + 6) + 610
-						local uy = floor((i - 1) / 4) * (MANGA_HEIGHT + 6) - slider.Y + 6
-						if oldtouch.x > lx and oldtouch.x < lx + MANGA_WIDTH and oldtouch.y > uy and oldtouch.y < uy + MANGA_HEIGHT then
+					local layout = Grid.layout()
+					local start = Grid.first(slider.Y)
+					for i = start, min(#currentMangaList, start + Grid.capacity() - 1) do
+						local lx = Grid.x(i)
+						local uy = gridY(i)
+						if oldtouch.x > lx and oldtouch.x < lx + layout.width and oldtouch.y >= gridTop() and oldtouch.y < 524 and oldtouch.y > uy and oldtouch.y < uy + layout.itemHeight then
 							selectManga(i)
 							break
 						end
@@ -889,6 +962,9 @@ function Catalogs.input(oldpad, pad, oldtouch, touch)
 	end
 	if TOUCH_MODES.MODE == TOUCH_MODES.SLIDE and oldtouch.x and touch.x and touch.x > 205 then
 		slider.V = oldtouch.y - touch.y
+		if isGrid() then
+			slider.V = slider.V * (1000 / 60) / UI.dt
+		end
 	end
 end
 
@@ -901,7 +977,7 @@ function GenPanels()
 		"Circle",
 		"Triangle",
 		["L\\R"] = Language[Settings.Language].PANEL.CHANGE_SECTION,
-		Square = Language[Settings.Language].PANEL.MODE,
+		Square = Language[Settings.Language].PANEL.FILTERS,
 		Triangle = Language[Settings.Language].PANEL.JUMPTOPAGE,
 		Circle = Language[Settings.Language].PANEL.BACK,
 		DPad = Language[Settings.Language].PANEL.CHOOSE,
@@ -985,16 +1061,44 @@ function GenPanels()
 end
 
 function Catalogs.update()
+	updateFolderSizes()
+	if status == "LIBRARY" then
+		if Database.refreshStorage and Timer.getTime(storageTimer) > 1000 then
+			Database.refreshStorage()
+			Timer.reset(storageTimer)
+		end
+		local list = Database.getMangaList()
+		if currentMangaList ~= list then
+			Catalogs.shrink()
+			downloadedImages = {}
+			currentMangaList = list
+		end
+	end
+	if isGrid() then syncGridLayout() end
 	if pcSync and not Threads.check(pcSync) then
 		finishPcSync()
 	end
-	if abs(slider.V) < 1 then
+	if isGrid() then
+		local frames = UI.dt / (1000 / 60)
+		-- Integrate exponential drag so travel is independent of frame rate.
+		local decay = math.pow(1 / 1.12, frames)
+		slider.Y = slider.Y + slider.V * (1 - decay) / (1 - 1 / 1.12)
+		slider.V = slider.V * decay
+		if abs(slider.V) < 0.1 then slider.V = 0 end
+	elseif abs(slider.V) < 1 then
 		slider.V = 0
 	else
 		slider.Y = slider.Y + slider.V
 		slider.V = slider.V / 1.12
 	end
 	if status == "MANGA" or status == "LIBRARY" or status == "HISTORY" then
+		-- Opening a source (or changing its filters) must start page one even
+		-- when the empty grid is already clamped to its zero scroll limit.
+		if status == "MANGA" and page == 1 and currentParser and not ParserManager.check(currentMangaList) then
+			ParserManager.getMangaListAsync(CatalogModes.getMangaMode(), currentParser, page, currentMangaList, CatalogModes.getSearchData(), CatalogModes.getTagsData())
+			page = page + 1
+			manga_load_status = 1
+		end
 		UpdateMangas()
 		if ParserManager.check(currentMangaList) then
 			manga_load_status = 1
@@ -1004,8 +1108,14 @@ function Catalogs.update()
 		end
 		local item = mangaSelector:getSelected()
 		if item ~= 0 then
-			slider.Y = slider.Y + (math.floor((item - 1) / 4) * (MANGA_HEIGHT + 6) + MANGA_HEIGHT / 2 - 232 - slider.Y) / 8
-			if status == "MANGA" and not currentMangaList.NoPages and currentParser and item > #currentMangaList - 4 then
+			local layout = Grid.layout()
+			local target = floor((item - 1) / layout.columns) * layout.stride + layout.height / 2 - 232
+			if isGrid() then
+				slider.Y = UI.approach(slider.Y, min(gridLimit(), max(0, target + gridTop() / 2)), 90)
+			else
+				slider.Y = slider.Y + (target - slider.Y) / 8
+			end
+			if status == "MANGA" and not currentMangaList.NoPages and currentParser and item > #currentMangaList - layout.columns then
 				if not ParserManager.check(currentMangaList) then
 					ParserManager.getMangaListAsync(CatalogModes.getMangaMode(), currentParser, page, currentMangaList, CatalogModes.getSearchData(), CatalogModes.getTagsData())
 					page = page + 1
@@ -1015,8 +1125,8 @@ function Catalogs.update()
 		if slider.Y < 0 then
 			slider.Y = 0
 			slider.V = 0
-		elseif slider.Y > ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 6) - 512 - 6 then
-			slider.Y = max(0, ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 6) - 512 - 6)
+		elseif slider.Y > gridLimit() then
+			slider.Y = gridLimit()
 			slider.V = 0
 			if status == "MANGA" then
 				if not currentMangaList.NoPages and currentParser then
@@ -1027,9 +1137,7 @@ function Catalogs.update()
 				end
 			end
 		end
-		if status == "LIBRARY" and #currentMangaList ~= #Database.getMangaList() then
-			currentMangaList = Database.getMangaList()
-		elseif status == "HISTORY" then
+		if status == "HISTORY" then
 			currentMangaList = Cache.getHistory()
 		end
 	else
@@ -1170,31 +1278,34 @@ function Catalogs.draw()
 		local first = max(1, floor((slider.Y - 10) / 75))
 		local y = first * 75 - slider.Y
 		local last = min(#parsersList, first + 9)
+		local selected = parserSelector:getSelected()
 		for i = first, last do
 			local parser = parsersList[i]
-			if slider.ItemID == i then
-				Graphics.fillRect(215, 945, y - 75, y - 1, COLOR_SELECTED)
-			end
-			Font.print(FONT26, 225, y - 70, parser.Name, COLOR_FONT)
+			UI.listCard(y - 70, y - 3, slider.ItemID == i or selected == i)
+			local favourite = Settings.FavouriteParsers[parser.ID]
+			local badge = parser.isNew and "New" or (parser.isUpdated and "Updated" or "")
+			local nameWidth = 560 - (favourite and 24 or 0) - (parser.NSFW and 54 or 0) - (badge ~= "" and Font.getTextWidth(FONT16, badge) + 10 or 0)
+			local name = FitText(FONT26, parser.Name, nameWidth)
+			Font.print(FONT26, 229, y - 64, name, COLOR_FONT)
 			local lang_text = parser.Custom and "Your site" or (Language[Settings.Language].PARSERS[parser.Lang] or parser.Lang or "")
-			Font.print(FONT16, 935 - Font.getTextWidth(FONT16, lang_text), y - 15 - Font.getTextHeight(FONT16, lang_text), lang_text, COLOR_SUBFONT)
-			local width = Font.getTextWidth(FONT26, parser.Name)
-			if Settings.FavouriteParsers[parser.ID] then
-				Graphics.drawImage(230 + width, y - 70 + 8, MiniStarIcon.e, COLOR_ROYAL_BLUE)
-				width = width + 16 + 5
+			lang_text = FitText(FONT16, lang_text, 130)
+			Font.print(FONT16, 931 - Font.getTextWidth(FONT16, lang_text), y - 29, lang_text, COLOR_SUBFONT)
+			local width = Font.getTextWidth(FONT26, name)
+			if favourite then
+				Graphics.drawImage(235 + width, y - 56, MiniStarIcon.e, UI.color("SELECTOR"))
+				width = width + 24
 			end
 			if parser.NSFW then
-				Font.print(FONT16, 230 + width, y - 70 + Font.getTextHeight(FONT26, parser.Name) - Font.getTextHeight(FONT16, "NSFW"), "NSFW", COLOR_ROYAL_BLUE)
-				width = width + Font.getTextWidth(FONT16, "NSFW") + 5
+				Font.print(FONT16, 235 + width, y - 56, "NSFW", UI.color("SELECTOR"))
+				width = width + 54
 			end
-			if parser.isNew then
-				Font.print(FONT16, 230 + width, y - 70 + Font.getTextHeight(FONT26, parser.Name) - Font.getTextHeight(FONT16, "New"), "New", COLOR_CRIMSON)
-			elseif parser.isUpdated then
-				Font.print(FONT16, 230 + width, y - 70 + Font.getTextHeight(FONT26, parser.Name) - Font.getTextHeight(FONT16, "Updated"), "Updated", COLOR_CRIMSON)
+			if badge ~= "" then
+				Font.print(FONT16, 235 + width, y - 56, badge, UI.color("DANGER"))
 			end
-			Font.print(FONT16, 935 - Font.getTextWidth(FONT16, "v" .. parser.Version), y - 65, "v" .. parser.Version, COLOR_SUBFONT)
-			local link_text = parser.Link .. "/"
-			Font.print(FONT16, 225, y - 23 - Font.getTextHeight(FONT16, link_text), link_text, COLOR_SUBFONT)
+			local version = FitText(FONT16, "v" .. tostring(parser.Version or ""), 130)
+			Font.print(FONT16, 931 - Font.getTextWidth(FONT16, version), y - 59, version, COLOR_SUBFONT)
+			local link_text = FitText(FONT16, (parser.Link or ""):gsub("/+$", ""), 550)
+			Font.print(FONT16, 229, y - 29, link_text, COLOR_SUBFONT)
 			y = y + 75
 		end
 		local elementsCount = #parsersList
@@ -1214,14 +1325,12 @@ function Catalogs.draw()
 		local y = first * 75 - slider.Y
 		for i = first, min(#pcSources, first + 9) do
 			local src = pcSources[i]
-			if slider.ItemID == i then
-				Graphics.fillRect(215, 945, y - 75, y - 1, COLOR_SELECTED)
-			end
-			Font.print(FONT26, 225, y - 70, src.Name, COLOR_FONT)
+			UI.listCard(y - 70, y - 3, slider.ItemID == i or pcSelector:getSelected() == i)
+			Font.print(FONT26, 229, y - 64, FitText(FONT26, src.Name or src.Site or "", 550), COLOR_FONT)
 			local info = src.Manual and "" or ((src.Count or 0) .. " added")
-			Font.print(FONT16, 935 - Font.getTextWidth(FONT16, info), y - 65, info, COLOR_SUBFONT)
-			local hint = src.Manual and "Typed here - press X to open" or "From your PC - press X to open"
-			Font.print(FONT16, 225, y - 23 - Font.getTextHeight(FONT16, hint), hint, COLOR_SUBFONT)
+			Font.print(FONT16, 931 - Font.getTextWidth(FONT16, info), y - 59, info, COLOR_SUBFONT)
+			local hint = (src.Manual and "Added here" or "From your PC") .. "  ·  " .. (src.Site or "")
+			Font.print(FONT16, 229, y - 29, FitText(FONT16, hint, 690), COLOR_SUBFONT)
 			y = y + 75
 		end
 		if #pcSources > 7 then
@@ -1234,28 +1343,19 @@ function Catalogs.draw()
 		local y = start * 75 - slider.Y
 		for i = start, min(#list, start + 9) do
 			local object = list[i]
-			if slider.ItemID == i then
-				Graphics.fillRect(215, 945, y - 75, y - 1, COLOR_SELECTED)
-			end
+			UI.listCard(y - 70, y - 3, slider.ItemID == i or importSelector:getSelected() == i)
 			if object.active then
-				Font.print(FONT26, 225, y - 70, object.name, COLOR_FONT)
+				Font.print(FONT26, 229, y - 64, FitText(FONT26, object.name, 610), COLOR_FONT)
 			elseif object.directory then
-				Font.print(FONT26, 225, y - 70, "*" .. Language[Settings.Language].IMPORT.EXTERNAL_MEMORY .. "*", COLOR_ROYAL_BLUE)
+				Font.print(FONT26, 229, y - 64, FitText(FONT26, Language[Settings.Language].IMPORT.EXTERNAL_MEMORY, 610), UI.color("SELECTOR"))
 			else
-				Font.print(FONT26, 225, y - 70, object.name, COLOR_SUBFONT)
-			end
-			Graphics.fillRect(945, 955, y - 75, y - 1, COLOR_BACK)
-			if object.active and object.name ~= "..." then
-				if slider.ItemID == i then
-					Graphics.fillRect(925 - 16 - 12 - 34 + 10, 945, y - 75, y - 1, COLOR_SELECTED)
-				else
-					Graphics.fillRect(925 - 16 - 12 - 34 + 10, 945, y - 75, y - 1, COLOR_BACK)
-				end
+				Font.print(FONT26, 229, y - 64, FitText(FONT26, object.name, 610), COLOR_SUBFONT)
 			end
 			local textDis = object.name == "..." and Language[Settings.Language].IMPORT.GOBACK or object.directory and (object.active and Language[Settings.Language].IMPORT.FOLDER or Language[Settings.Language].IMPORT.DRIVE .. ' "' .. object.name .. '"') or object.active and Language[Settings.Language].IMPORT.FILE or Language[Settings.Language].IMPORT.UNSUPFILE
-			Font.print(FONT16, 225, y - 23 - Font.getTextHeight(FONT16, textDis), textDis, COLOR_SUBFONT)
+			Font.print(FONT16, 229, y - 29, FitText(FONT16, textDis, 610), COLOR_SUBFONT)
 			if object.active and object.name ~= "..." then
-				Graphics.drawImage(925 - 16 - 12, y - 38 - 14, ImportIcon.e, COLOR_ICON_EXTRACT)
+				Graphics.fillRect(865, 866, y - 58, y - 15, COLOR_SUBFONT)
+				Graphics.drawImage(897, y - 49, ImportIcon.e, COLOR_ICON_EXTRACT)
 			end
 			y = y + 75
 		end
@@ -1273,22 +1373,23 @@ function Catalogs.draw()
 				local task = list[i]
 				local pageCount = task.page_count or 0
 				local page = task.page or 0
-				if slider.ItemID == i then
-					Graphics.fillRect(215, 945, y - 75, y - 1, COLOR_SELECTED)
-				end
-				Font.print(FONT20, 225, y - 70, task.MangaName, COLOR_FONT)
-				Font.print(FONT16, 225, y - 44, task.ChapterName, COLOR_FONT)
+				UI.listCard(y - 70, y - 3, slider.ItemID == i or downloadSelector:getSelected() == i)
+				Font.print(FONT20, 229, y - 65, FitText(FONT20, task.MangaName, 690), COLOR_FONT)
+				Font.print(FONT16, 229, y - 42, FitText(FONT16, task.ChapterName, 690), COLOR_SUBFONT)
 				if task.Saved then
-					Font.print(FONT16, 225, y - 24, "Downloaded", COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 229, y - 23, "Downloaded", UI.color("SELECTOR"))
 				elseif pageCount > 0 then
 					local textCounter = math.ceil(page) .. "/" .. pageCount
 					local w = Font.getTextWidth(FONT16, textCounter)
-					downloadBarValue = page / pageCount
-					Graphics.fillRect(220 + 10 + w, 220 + 10 + w + (940 - 220 - 10 - w) * downloadBarValue, y - 20, y - 8, COLOR_ROYAL_BLUE)
-					Graphics.fillEmptyRect(220 + 10 + w, 940, y - 20, y - 8, COLOR_FONT)
-					Font.print(FONT16, 225, y - 24, textCounter, COLOR_FONT)
-				elseif i == 1 then
-					downloadBarValue = 0
+					downloadBarValue = max(0, min(1, page / pageCount))
+					local left = min(915, 241 + w)
+					UI.roundRect(left, 931, y - 17, y - 11, COLOR_SELECTED)
+					if downloadBarValue > 0 then
+						UI.roundRect(left, left + (931 - left) * downloadBarValue, y - 17, y - 11, UI.color("SELECTOR"))
+					end
+					Font.print(FONT16, 229, y - 23, textCounter, UI.color("SELECTOR"))
+				else
+					Font.print(FONT16, 229, y - 23, i == 1 and "Preparing download…" or "Queued", COLOR_SUBFONT)
 				end
 				y = y + 75
 			end
@@ -1306,14 +1407,13 @@ function Catalogs.draw()
 		local y = start * 75 - slider.Y
 		for i = start, min(#list, start + 9) do
 			local task = list[i]
-			if slider.ItemID == i then
-				local dyForTranslators = list[i] == "Translators" and 145 or 0
-				Graphics.fillRect(215, 945, y - 75, y - 1 + dyForTranslators, COLOR_SELECTED)
-			end
+			local extraHeight = task == "Translators" and 145 or 0
+			-- Settings use three text lines; the taller credits card keeps its existing extent.
+			UI.listCard(y - 73, y - 2 + extraHeight, slider.ItemID == i or settingSelector:getSelected() == i)
 			if type(task) == "table" then
 				if Settings.getTab() == "DonatorsList" then
 					if i == 1 then
-						Font.print(FONT26, (215 + 945) / 2 - Font.getTextWidth(FONT26, task.name) / 2, y - 45 - Font.getTextHeight(FONT26, task.name) / 2, task.name, COLOR_CRIMSON)
+						Font.print(FONT26, (215 + 945) / 2 - Font.getTextWidth(FONT26, task.name) / 2, y - 45 - Font.getTextHeight(FONT26, task.name) / 2, task.name, UI.color("DANGER"))
 					else
 						Font.print(FONT26, (215 + 945) / 2 - Font.getTextWidth(FONT26, task.name) / 2, y - 45 - Font.getTextHeight(FONT26, task.name) / 2, task.name, COLOR_FONT)
 					end
@@ -1327,7 +1427,7 @@ function Catalogs.draw()
 				if task == "DonatorsList" then
 					Font.print(FONT20, 225, y - 70, Language[Settings.Language].SETTINGS[task] or task, Color.new(136, 0, 255))
 					if Language[Settings.Language].SETTINGS_DESCRIPTION[task] then
-						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS_DESCRIPTION[task], COLOR_ROYAL_BLUE)
+						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS_DESCRIPTION[task], UI.color("SELECTOR"))
 					end
 				else
 					Font.print(FONT20, 225, y - 70, FitText(FONT20, Language[Settings.Language].SETTINGS[task] or task, 710), COLOR_FONT)
@@ -1351,25 +1451,11 @@ function Catalogs.draw()
 					Font.print(FONT16, 225, y - 44, LanguageNames[Settings.Language][Settings.Language], COLOR_FONT)
 				elseif task == "ClearChapters" then
 					if chaptersFolderSize == nil then
-						chaptersFolderSize = 0
-						local function getDirectorySize(dir)
-							local d = listDirectory(dir) or {}
-							for k = 1, #d do
-								if d[k].directory then
-									getDirectorySize(dir .. "/" .. d[k].name)
-								else
-									chaptersFolderSize = chaptersFolderSize + d[k].size
-								end
-							end
-						end
-						getDirectorySize("ux0:data/noboru/chapters")
-						if doesDirExist("uma0:data/noboru/chapters") then
-							getDirectorySize("uma0:data/noboru/chapters")
-						end
+						folderSizeRequests.chapters = true
 					end
-					Font.print(FONT16, 225, y - 44, BytesToStr(chaptersFolderSize), COLOR_SUBFONT)
+					Font.print(FONT16, 225, y - 44, chaptersFolderSize and BytesToStr(chaptersFolderSize) or "...", COLOR_SUBFONT)
 					if sure_clear_chapters > 0 then
-						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ReaderMode" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].READER[Settings.ReaderMode] or Settings.ReaderMode, COLOR_SUBFONT)
@@ -1378,60 +1464,64 @@ function Catalogs.draw()
 				elseif task == "PreferredCatalogLanguage" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].PARSERS[Settings.ParserLanguage] or Settings.ParserLanguage or "error_type", COLOR_SUBFONT)
 				elseif task == "ShowNSFW" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].NSFW[Settings.NSFW], Settings.NSFW and COLOR_CRIMSON or COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].NSFW[Settings.NSFW], Settings.NSFW and UI.color("DANGER") or UI.color("SELECTOR"))
 				elseif task == "HideInOffline" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.HideInOffline], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.HideInOffline], UI.color("SELECTOR"))
 				elseif task == "SkipFontLoading" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SkipFontLoad], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SkipFontLoad], UI.color("SELECTOR"))
 				elseif task == "ZoomReader" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].READER[Settings.ZoomReader], COLOR_SUBFONT)
 				elseif task == "DoubleTapReader" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.DoubleTapReader], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.DoubleTapReader], UI.color("SELECTOR"))
 				elseif task == "RefreshLibAtStart" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.RefreshLibAtStart], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.RefreshLibAtStart], UI.color("SELECTOR"))
 				elseif task == "UISoundDirections" or task == "UISoundCross" or task == "UISoundCircle" or task == "UISoundSquare" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings[task] ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings[task] ~= false], UI.color("SELECTOR"))
 				elseif task == "SilentDownloads" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SilentDownloads], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SilentDownloads], UI.color("SELECTOR"))
 				elseif task == "ChangeUI" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].THEME[Settings.Theme] or Settings.Theme, COLOR_SUBFONT)
 				elseif task == "LibrarySorting" then
 					Font.print(FONT16, 225, y - 44, Settings.LibrarySorting, COLOR_SUBFONT)
+				elseif task == "GridDisplay" then
+					Font.print(FONT16, 225, y - 44, Settings.GridDisplay, UI.color("SELECTOR"))
+				elseif task == "GridColumns" then
+					Font.print(FONT16, 225, y - 44, tostring(Settings.GridColumns), UI.color("SELECTOR"))
 				elseif task == "ChapterSorting" then
 					Font.print(FONT16, 225, y - 44, Settings.ChapterSorting, COLOR_SUBFONT)
 				elseif task == "ConnectionTime" then
-					Font.print(FONT16, 225, y - 44, Settings.ConnectionTime, COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Settings.ConnectionTime, UI.color("SELECTOR"))
 				elseif task == "WebpConvert" then
-					Font.print(FONT16, 225, y - 44, string.upper(Settings.WebpConvert), COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, string.upper(Settings.WebpConvert), UI.color("SELECTOR"))
 				elseif task == "FastImages" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.FastImages ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.FastImages ~= false], UI.color("SELECTOR"))
 				elseif task == "VitaSurfBridge" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.VitaSurfBridge ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.VitaSurfBridge ~= false], UI.color("SELECTOR"))
 				elseif task == "SiteProfiles" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SiteProfiles ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SiteProfiles ~= false], UI.color("SELECTOR"))
 				elseif task == "ReaderClock" then
 					local clockNames = { off = "OFF", time = "TIME", date = "DATE", both = "TIME + DATE" }
-					Font.print(FONT16, 225, y - 44, clockNames[Settings.ReaderClock or "off"] or "OFF", COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, clockNames[Settings.ReaderClock or "off"] or "OFF", UI.color("SELECTOR"))
 				elseif task == "ReaderClockPos" then
-					Font.print(FONT16, 225, y - 44, Settings.ReaderClockPos == "right" and "TOP RIGHT" or "TOP LEFT", COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Settings.ReaderClockPos == "right" and "TOP RIGHT" or "TOP LEFT", UI.color("SELECTOR"))
 				elseif task == "ReaderClock24h" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.ReaderClock24h == true], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.ReaderClock24h == true], UI.color("SELECTOR"))
 				elseif task == "CFCheck" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.CFCheck ~= false], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.CFCheck ~= false], UI.color("SELECTOR"))
 				elseif task == "CFBridge" then
-					Font.print(FONT16, 225, y - 44, string.upper(Settings.CFBridge or "auto"), COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, string.upper(Settings.CFBridge or "auto"), UI.color("SELECTOR"))
 				elseif task == "UseProxy" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.UseProxy], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.UseProxy], UI.color("SELECTOR"))
 				elseif task == "ProxyIP" then
 					Font.print(FONT16, 225, y - 44, Settings.ProxyIP, COLOR_SUBFONT)
 				elseif task == "ProxyPort" then
 					Font.print(FONT16, 225, y - 44, Settings.ProxyPort, COLOR_SUBFONT)
 				elseif task == "UseProxyAuth" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.UseProxyAuth], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.UseProxyAuth], UI.color("SELECTOR"))
 				elseif task == "SkipCacheChapterChecking" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SkipCacheChapterChecking], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.SkipCacheChapterChecking], UI.color("SELECTOR"))
 				elseif task == "PressEdgesToChangePage" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.PressEdgesToChangePage], COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].YORN[Settings.PressEdgesToChangePage], UI.color("SELECTOR"))
 				elseif task == "ProxyAuth" then
 					Font.print(FONT16, 225, y - 44, Settings.ProxyAuth, COLOR_SUBFONT)
 				elseif task == "ChapterSorting" then
@@ -1439,25 +1529,25 @@ function Catalogs.draw()
 				elseif task == "LeftStickDeadZone" then
 					local x = 0
 					for n = 1, #DeadZoneValues do
-						Font.print(FONT16, 225 + x, y - 44, DeadZoneValues[n], DeadZoneValues[n] == Settings.LeftStickDeadZone and COLOR_CRIMSON or COLOR_SUBFONT)
+						Font.print(FONT16, 225 + x, y - 44, DeadZoneValues[n], DeadZoneValues[n] == Settings.LeftStickDeadZone and UI.color("DANGER") or COLOR_SUBFONT)
 						x = x + Font.getTextWidth(FONT16, DeadZoneValues[n]) + 5
 					end
 				elseif task == "LeftStickSensitivity" then
 					local x = 0
 					for n = 1, #SensitivityValues do
-						Font.print(FONT16, 225 + x, y - 44, SensitivityValues[n], SensitivityValues[n] == Settings.LeftStickSensitivity and COLOR_CRIMSON or COLOR_SUBFONT)
+						Font.print(FONT16, 225 + x, y - 44, SensitivityValues[n], SensitivityValues[n] == Settings.LeftStickSensitivity and UI.color("DANGER") or COLOR_SUBFONT)
 						x = x + Font.getTextWidth(FONT16, SensitivityValues[n]) + 5
 					end
 				elseif task == "RightStickDeadZone" then
 					local x = 0
 					for n = 1, #DeadZoneValues do
-						Font.print(FONT16, 225 + x, y - 44, DeadZoneValues[n], DeadZoneValues[n] == Settings.RightStickDeadZone and COLOR_CRIMSON or COLOR_SUBFONT)
+						Font.print(FONT16, 225 + x, y - 44, DeadZoneValues[n], DeadZoneValues[n] == Settings.RightStickDeadZone and UI.color("DANGER") or COLOR_SUBFONT)
 						x = x + Font.getTextWidth(FONT16, DeadZoneValues[n]) + 5
 					end
 				elseif task == "RightStickSensitivity" then
 					local x = 0
 					for n = 1, #SensitivityValues do
-						Font.print(FONT16, 225 + x, y - 44, SensitivityValues[n], SensitivityValues[n] == Settings.RightStickSensitivity and COLOR_CRIMSON or COLOR_SUBFONT)
+						Font.print(FONT16, 225 + x, y - 44, SensitivityValues[n], SensitivityValues[n] == Settings.RightStickSensitivity and UI.color("DANGER") or COLOR_SUBFONT)
 						x = x + Font.getTextWidth(FONT16, SensitivityValues[n]) + 5
 					end
 				elseif task == "ChangingPageButtons" then
@@ -1473,43 +1563,31 @@ function Catalogs.draw()
 								return " " .. (LanguageNames[Settings.Language][a] or a) .. " "
 							end
 						),
-						COLOR_ROYAL_BLUE
+						UI.color("SELECTOR")
 					)
 				elseif task == "DeleteAddedSources" then
 					if sure_delete_sources > 0 then
-						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ClearLibrary" then
 					if sure_clear_library > 0 then
-						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ClearCache" then
 					if sure_clear_cache > 0 then
-						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ClearAllCache" then
 					if cacheFolderSize == nil then
-						cacheFolderSize = 0
-						local function getDirectorySize(dir)
-							local d = listDirectory(dir) or {}
-							for j = 1, #d do
-								local f = d[j]
-								if f.directory then
-									getDirectorySize(dir .. "/" .. f.name)
-								else
-									cacheFolderSize = cacheFolderSize + f.size
-								end
-							end
-						end
-						getDirectorySize("ux0:data/noboru/cache")
+						folderSizeRequests.cache = true
 					end
-					Font.print(FONT16, 225, y - 44, BytesToStr(cacheFolderSize), COLOR_SUBFONT)
+					Font.print(FONT16, 225, y - 44, cacheFolderSize and BytesToStr(cacheFolderSize) or "...", COLOR_SUBFONT)
 					if sure_clear_all_cache > 0 then
-						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, COLOR_CRIMSON)
+						Font.print(FONT16, 225, y - 24, Language[Settings.Language].SETTINGS.PressAgainToAccept, UI.color("DANGER"))
 					end
 				elseif task == "ShowAuthor" then
 					Font.print(FONT16, 225, y - 44, "Claude AI (assistant)", COLOR_SUBFONT)
-					Font.print(FONT16, 225, y - 24, "Fork of Creckeryop/NOBORU", COLOR_ROYAL_BLUE)
+					Font.print(FONT16, 225, y - 24, "Fork of Creckeryop/NOBORU", UI.color("SELECTOR"))
 				elseif task == "SupportDev" then
 					Font.print(FONT16, 225, y - 44, "github.com/Creckeryop/NOBORU", COLOR_SUBFONT)
 				elseif task == "ShowVersion" then
@@ -1519,7 +1597,7 @@ function Catalogs.draw()
 				elseif task == "SwapXO" then
 					Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS[Settings.KeyType], COLOR_SUBFONT)
 				elseif task == "CheckUpdate" then
-					Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.LatestVersion .. Settings.LateVersion, tonumber(Settings.LateVersion) > tonumber(Settings.Version) and COLOR_ROYAL_BLUE or COLOR_SUBFONT)
+					Font.print(FONT16, 225, y - 44, Language[Settings.Language].SETTINGS.LatestVersion .. Settings.LateVersion, tonumber(Settings.LateVersion) > tonumber(Settings.Version) and UI.color("SELECTOR") or COLOR_SUBFONT)
 				elseif task == "SaveDataPath" then
 					Font.print(FONT16, 225, y - 44, Settings.SaveDataPath, COLOR_SUBFONT)
 				elseif task == "AnimatedGif" then
@@ -1538,32 +1616,26 @@ function Catalogs.draw()
 		itemHeight = list[item] == "Translators" and 145 or 0
 	elseif status == "MANGA" or status == "LIBRARY" or status == "HISTORY" then
 		if #currentMangaList ~= 0 then
-			local start = max(1, floor(slider.Y / (MANGA_HEIGHT + 6)) * 4 + 1)
-			for i = start, min(#currentMangaList, start + 15) do
-				local x = 580 + (((i - 1) % 4) - 2) * (MANGA_WIDTH + 6) + 3
-				local y = -slider.Y + floor((i - 1) / 4) * (MANGA_HEIGHT + 6) + 6
-				DrawManga(x + MANGA_WIDTH / 2, y + MANGA_HEIGHT / 2, currentMangaList[i])
-				if status == "LIBRARY" and currentMangaList[i].Counter then
+			local layout = Grid.layout()
+			local start = Grid.first(slider.Y)
+			for i = start, min(#currentMangaList, start + Grid.capacity() - 1) do
+				local x = Grid.x(i)
+				local y = gridY(i)
+				DrawManga(x + layout.width / 2, y + layout.height / 2, currentMangaList[i], layout.width, layout.height, layout.coverOnly, layout.titlesBelow)
+				UI.roundCorners(x, x + layout.width, y, y + layout.height, 10, COLOR_BACK)
+				UI.roundBorder(x, x + layout.width, y, y + layout.height, 10, 1, UI.color("BORDER"))
+				if status == "LIBRARY" and not layout.coverOnly and currentMangaList[i].Counter then
 					local c = currentMangaList[i].Counter
 					if c > 0 then
-						Graphics.fillRect(x, x + Font.getTextWidth(BONT16, c) + 11, y, y + 24, Themes[Settings.Theme].COLOR_LABEL)
-						Font.print(BONT16, x + 5, y + 2, tostring(c), COLOR_WHITE)
+						UI.roundRect(x + 6, x + Font.getTextWidth(BONT16, c) + 22, y + 6, y + 30, UI.color("PRIMARY", 0.94))
+						Font.print(BONT16, x + 14, y + 8, tostring(c), UI.color("ON_PRIMARY"))
 					end
 				end
 			end
 			local item = mangaSelector:getSelected()
 			if item ~= 0 then
-				local x = 580 + (((item - 1) % 4) - 2) * (MANGA_WIDTH + 6) + MANGA_WIDTH / 2 + 3
-				local y = MANGA_HEIGHT / 2 - slider.Y + floor((item - 1) / 4) * (MANGA_HEIGHT + 6) + 6
-				local wh = Color.new(255, 255, 255, 100 * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
-				local ks = math.ceil(4 * math.sin(Timer.getTime(GlobalTimer) / 100))
-				for i = ks + 1, ks + 3 do
-					Graphics.fillEmptyRect(x - MANGA_WIDTH / 2 + i, x + MANGA_WIDTH / 2 - i + 1, y - MANGA_HEIGHT / 2 + i, y + MANGA_HEIGHT / 2 - i + 1, Themes[Settings.Theme].COLOR_SELECTOR)
-					Graphics.fillEmptyRect(x - MANGA_WIDTH / 2 + i, x + MANGA_WIDTH / 2 - i + 1, y - MANGA_HEIGHT / 2 + i, y + MANGA_HEIGHT / 2 - i + 1, wh)
-				end
-			end
-			if #currentMangaList > 4 then
-				scrollHeight = ceil(#currentMangaList / 4) * (MANGA_HEIGHT + 14) / 524
+				local x, y = Grid.x(item), gridY(item)
+				UI.focusBorder(x, x + layout.width, y, y + layout.height, 10, nil, 4)
 			end
 		else
 			if status == "LIBRARY" then
@@ -1593,24 +1665,56 @@ function Catalogs.draw()
 			Font.print(FONT16, 582 - math.floor(line.Width / 2), 272 - math.floor(height / 2) + dy, line.Text, Themes[Settings.Theme].COLOR_SUBFONT)
 			dy = dy + line.Height + 4
 		end
-		if smile then
+		if isGrid() then
+			Graphics.drawImage(570, 192 - floor(height / 2), status == "HISTORY" and HistoryIcon.e or status == "MANGA" and SearchIcon.e or StarIcon.e, UI.color("SELECTOR"))
+		elseif smile then
 			Font.print(FONT26, 582 - math.floor(Font.getTextWidth(FONT26, smile) / 2), 272 - math.floor(height / 2) + dy + 6, smile, Themes[Settings.Theme].COLOR_SUBFONT)
 		end
 	end
 	if item and item ~= 0 then
 		local y = item * 75 - slider.Y
-		local wh = Color.new(255, 255, 255, 100 * math.abs(math.sin(Timer.getTime(GlobalTimer) / 500)))
-		local ks = math.ceil(4 * math.sin(Timer.getTime(GlobalTimer) / 100))
-		for i = ks, ks + 1 do
-			Graphics.fillEmptyRect(218 + i, 942 - i + 1, y - i - 5 + itemHeight, y - 71 + i + 1, Themes[Settings.Theme].COLOR_SELECTOR)
-			Graphics.fillEmptyRect(218 + i, 942 - i + 1, y - i - 5 + itemHeight, y - 71 + i + 1, wh)
+		if status == "CATALOGS" or status == "IMPORT" or status == "PCSOURCES" or status == "DOWNLOAD" then
+			UI.focusBorder(215, 945, y - 70, y - 3, 10, nil, 4)
+		elseif status == "SETTINGS" then
+			UI.focusBorder(215, 945, y - 73, y - 2 + itemHeight, 10, nil, 4)
 		end
 	end
-	Graphics.fillRect(955, 960, 0, 544, COLOR_BACK)
-	if scrollHeight then
-		Graphics.fillRect(955, 960, slider.Y / scrollHeight, (slider.Y + 524) / scrollHeight, COLOR_FONT)
+	if isGrid() then
+		-- Paint the fixed header after the covers to clip their scrolling edge.
+		Graphics.fillRect(205, 960, 0, 58, COLOR_BACK)
+		Graphics.fillRect(221, 945, 57, 58, Color.new(Color.getR(COLOR_FONT), Color.getG(COLOR_FONT), Color.getB(COLOR_FONT), 30))
+		local title = status == "MANGA" and (currentParser and currentParser.Name or Language[Settings.Language].APP.CATALOGS) or Language[Settings.Language].APP[status]
+		Font.print(FONT26, 223, 15, FitText(FONT26, UI.capitalize(title), 650), COLOR_FONT)
+		local count = tostring(#currentMangaList)
+		local width = Font.getTextWidth(FONT20, count)
+		UI.roundRect(929 - width, 945, 15, 43, COLOR_SELECTED)
+		Font.print(FONT20, 937 - width, 18, count, COLOR_FONT)
+		Graphics.fillRect(952, 960, 58, 544, COLOR_BACK)
+		Graphics.fillRect(205, 960, 524, 544, COLOR_BACK)
+		local limit = gridLimit()
+		if limit > 0 then
+			local track = 460
+			local thumb = max(28, track * track / (limit + track))
+			local top = 64 + (track - thumb) * max(0, min(1, slider.Y / limit))
+			UI.roundRect(955, 959, top, top + thumb, COLOR_SUBFONT)
+		end
+	elseif status == "CATALOGS" or status == "IMPORT" or status == "SETTINGS" or status == "PCSOURCES" or status == "DOWNLOAD" then
+		Graphics.fillRect(952, 960, 0, 544, COLOR_BACK)
+		Graphics.fillRect(205, 960, 524, 544, COLOR_BACK)
+		local content = (status == "IMPORT" and #Import.listDir() or status == "SETTINGS" and #Settings.list() or status == "PCSOURCES" and #pcSources or status == "DOWNLOAD" and #ChapterSaver.getDownloadingList() or #parsersList) * 75
+		if status == "SETTINGS" and Settings.getTab() == "About" then content = content + 140 end
+		if content > 504 then
+			local thumb = max(28, 504 * 504 / content)
+			local top = 10 + (504 - thumb) * max(0, min(1, (slider.Y + 10) / (content - 504)))
+			UI.roundRect(955, 959, top, top + thumb, COLOR_SUBFONT)
+		end
 	else
-		Graphics.fillRect(955, 960, 0, 524, COLOR_FONT)
+		Graphics.fillRect(955, 960, 0, 544, COLOR_BACK)
+		if scrollHeight then
+			Graphics.fillRect(955, 960, slider.Y / scrollHeight, (slider.Y + 524) / scrollHeight, COLOR_FONT)
+		else
+			Graphics.fillRect(955, 960, 0, 524, COLOR_FONT)
+		end
 	end
 end
 
@@ -1630,6 +1734,8 @@ function Catalogs.terminate()
 	currentMangaList = {}
 	page = 1
 	slider.Y = -100
+	slider.V = 0
+	TOUCH_MODES.MODE = TOUCH_MODES.NONE
 	mangaSelector:resetSelected()
 	parserSelector:resetSelected()
 	downloadSelector:resetSelected()
@@ -1644,6 +1750,8 @@ end
 
 ---@param newStatus string | '"CATALOGS"' | '"MANGA"' | '"LIBRARY"' | '"DOWNLOAD"'
 function Catalogs.setStatus(newStatus)
+	cancelFolderSizeScan()
+	if newStatus == "LIBRARY" and Database.refreshStorage then Database.refreshStorage() end
 	status = newStatus
 	chaptersFolderSize = nil
 	cacheFolderSize = nil

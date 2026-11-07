@@ -7,7 +7,6 @@ local order = {}
 local notification = nil
 
 ---Easing function that used here
-local easingFunction = EaseInOutCubic
 local animationTimer = Timer.new()
 
 ---@param message string
@@ -42,7 +41,7 @@ end
 
 ---Updates notification animation
 function Notifications.update()
-	if not notification or Timer.getTime(animationTimer) > 1000 + notification[2] then
+	if not notification or Timer.getTime(animationTimer) >= UI.motion.enter + notification[2] + UI.motion.exit then
 		notification = table.remove(order, 1)
 		Timer.reset(animationTimer)
 	end
@@ -55,16 +54,15 @@ function Notifications.draw()
 	end
 	local time = Timer.getTime(animationTimer)
 	local fade = 0
-	if time < 500 then
-		fade = time / 500
-	elseif time < 500 + notification[2] then
+	if time < UI.motion.enter then
+		fade = 1 - (1 - time / UI.motion.enter) ^ 3
+	elseif time < UI.motion.enter + notification[2] then
 		fade = 1
-	elseif time < 1000 + notification[2] then
-		fade = 1 - (time - 500 - notification[2]) / 500
+	elseif time < UI.motion.enter + notification[2] + UI.motion.exit then
+		fade = 1 - ((time - UI.motion.enter - notification[2]) / UI.motion.exit) ^ 2
 	end
-	fade = easingFunction(fade)
-	local NEW_WHITE = Color.new(255, 255, 255, 255 * fade)
-	local NEW_GRAY = Color.new(20, 20, 20, 255 * fade)
+	local NEW_WHITE = UI.color("FONT", fade)
+	local NEW_GRAY = UI.color("SURFACE", fade)
 	local y = 0
 	for i = 1, #notification[1] do
 		local v = notification[1][i]

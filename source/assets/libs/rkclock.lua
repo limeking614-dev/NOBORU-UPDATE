@@ -154,13 +154,13 @@ function RKClock.draw()
 		local sc = 2
 		local w = #text * 4 * sc - sc
 		local x0 = Settings.ReaderClockPos == "right" and (544 - 8 - (w + 12)) or 8 -- rotated view is 544 wide
-		rect(true, x0, x0 + w + 12, 8, 8 + 5 * sc + 10, Color.new(0, 0, 0, 150))
-		glyphs(true, text, x0 + 6, 13, sc, Color.new(255, 255, 255, 235))
+		rect(true, x0, x0 + w + 12, 8, 8 + 5 * sc + 10, UI.color("SURFACE", 0.9))
+		glyphs(true, text, x0 + 6, 13, sc, UI.color("FONT", 0.92))
 	else
 		local w = Font.getTextWidth(FONT16, text) + 16
 		local x0 = Settings.ReaderClockPos == "right" and (960 - 8 - w) or 8
-		Graphics.fillRect(x0, x0 + w, 8, 34, Color.new(0, 0, 0, 150))
-		Font.print(FONT16, x0 + 8, 11, text, Color.new(255, 255, 255, 235))
+		Graphics.fillRect(x0, x0 + w, 8, 34, UI.color("SURFACE", 0.9))
+		Font.print(FONT16, x0 + 8, 11, text, UI.color("FONT", 0.92))
 	end
 end
 

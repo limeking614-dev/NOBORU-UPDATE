@@ -192,11 +192,16 @@ local function deletePageImage(page)
 	end
 end
 
-local function loadPageImage(page)
+local function loadPageImage(page, priority)
+	local add = priority == false and Threads.addTask or Threads.insertTask
 	local PageTable = allPages[page]
+	if Threads.check(PageTable) or ParserManager.check(PageTable) then
+		if priority ~= false and Threads.promote then Threads.promote(PageTable) end
+		return
+	end
 	if not PageTable.Image and not (PageTable.Link == "LoadPrev" or PageTable.Link == "LoadNext") then
 		if PageTable.Extract then
-			Threads.insertTask(
+			add(
 				PageTable,
 				{
 					Type = "UnZipFile",
@@ -218,7 +223,7 @@ local function loadPageImage(page)
 				}
 			)
 		elseif PageTable.Path then
-			Threads.insertTask(
+			add(
 				PageTable,
 				{
 					Type = "Image",
@@ -229,7 +234,7 @@ local function loadPageImage(page)
 				}
 			)
 		elseif PageTable.Link then
-			Threads.insertTask(
+			add(
 				PageTable,
 				{
 					Type = "ImageDownload",
@@ -240,7 +245,7 @@ local function loadPageImage(page)
 				}
 			)
 		else
-			ParserManager.loadPageImage(Chapters[currentChapterNumber].Manga.ParserID, PageTable[1], PageTable, true)
+			ParserManager.loadPageImage(Chapters[currentChapterNumber].Manga.ParserID, PageTable[1], PageTable, priority ~= false)
 		end
 	end
 end
@@ -278,6 +283,17 @@ local function changePage(page)
 			allPages[i].x = 0
 			allPages[i].y = 0
 		end
+	end
+	-- Start preparing the next page on chapter entry as well as after turns.
+	for i = 1, #allPages do
+		if math.abs(i - page) > 1 and (allPages[i].Image or Threads.check(allPages[i]) or ParserManager.check(allPages[i])) then
+			deletePageImage(i)
+		end
+	end
+	local ahead = page + (readDirection == "LEFT" and -1 or 1)
+	if allPages[ahead] and GetGPUMemoryUsed() < MAX_VRAM_MEMORY * 0.65 then
+		loadPageImage(ahead, false)
+		if Threads.promote then Threads.promote(allPages[page]) end
 	end
 	return true
 end
@@ -1095,60 +1111,14 @@ function Reader.update()
 		gesture_touch_update()
 		if allPages.PrevPage and allPages.PrevPage ~= allPages.Page and (((is_down and currentPageOffset.y or currentPageOffset.x) >= 0 and allPages.PrevPage > allPages.Page or (is_down and currentPageOffset.y or currentPageOffset.x) <= 0 and allPages.PrevPage < allPages.Page) and orientation == "Horizontal" or ((is_down and -currentPageOffset.x or currentPageOffset.y) >= 0 and allPages.PrevPage > allPages.Page or (is_down and -currentPageOffset.x or currentPageOffset.y) <= 0 and allPages.PrevPage < allPages.Page) and orientation == "Vertical") then
 			if allPages.PrevPage > 0 and allPages.PrevPage <= #allPages then
-				deletePageImage(allPages.PrevPage)
+				-- Keep one page behind for immediate reverse navigation when memory permits.
+				if GetGPUMemoryUsed() > MAX_VRAM_MEMORY * 0.8 then
+					deletePageImage(allPages.PrevPage)
+				end
 			end
 			local p = allPages.Page + math.sign(allPages.Page - allPages.PrevPage)
-			if p > 0 and p <= #allPages then
-				if not allPages[p].Image and not (allPages[p].Link == "LoadPrev" or allPages[p].Link == "LoadNext") then
-					if allPages[p].Extract then
-						local new_page = allPages[p]
-						Threads.addTask(
-							new_page,
-							{
-								Type = "UnZipFile",
-								Path = new_page.Path,
-								Extract = new_page.Extract,
-								DestPath = "ux0:data/noboru/temp/cache.image",
-								OnComplete = function()
-									Threads.insertTask(
-										new_page,
-										{
-											Type = "Image",
-											Table = new_page,
-											Path = "temp/cache.image",
-											Index = "Image",
-											Animated = Settings.AnimatedGif
-										}
-									)
-								end
-							}
-						)
-					elseif allPages[p].Path then
-						Threads.addTask(
-							allPages[p],
-							{
-								Type = "Image",
-								Path = allPages[p].Path,
-								Table = allPages[p],
-								Index = "Image",
-								Animated = Settings.AnimatedGif
-							}
-						)
-					elseif allPages[p].Link then
-						Threads.addTask(
-							allPages[p],
-							{
-								Type = "ImageDownload",
-								Link = allPages[p].Link,
-								Table = allPages[p],
-								Index = "Image",
-								Animated = Settings.AnimatedGif
-							}
-						)
-					else
-						ParserManager.loadPageImage(Chapters[currentChapterNumber].Manga.ParserID, allPages[p][1], allPages[p], p, false)
-					end
-				end
+			if p > 0 and p <= #allPages and GetGPUMemoryUsed() < MAX_VRAM_MEMORY * 0.65 then
+				loadPageImage(p, false)
 			end
 		end
 		local o = readDirection == "LEFT" and {1, -1, 0} or {-1, 1, 0}
@@ -1516,9 +1486,9 @@ function Reader.draw()
 	RK_ReaderVertical = orientation == "Vertical"
 	RK_BarsShown = MenuFade > 0.02
 	if currentState == STATE_LOADING then
-		local manga_name = Chapters[currentChapterNumber].Manga.Name
+		local manga_name = UI.capitalize(Chapters[currentChapterNumber].Manga.Name)
 		local prepare_message = Language[Settings.Language].READER.PREPARING_PAGES .. string.sub("...", 1, math.ceil(Timer.getTime(GlobalTimer) / 250) % 4)
-		local chapter_name = Chapters[currentChapterNumber].Name
+		local chapter_name = UI.capitalize(Chapters[currentChapterNumber].Name)
 		if Font.getTextWidth(BONT30, manga_name) > 960 then
 			Font.print(FONT16, 480 - Font.getTextWidth(FONT16, manga_name) / 2, 242, manga_name, COLOR_FONT)
 		else
@@ -1615,14 +1585,14 @@ function Reader.draw()
 				Counter = (allPages.Count - allPages.Page + 1) .. "/" .. allPages.Count
 			end
 			local Width = Font.getTextWidth(FONT16, Counter) + 20
-			Graphics.fillRect(960 - Width, 960, counterShift, counterShift + Font.getTextHeight(FONT16, Counter) + 4, Color.new(0, 0, 0, 128))
-			Font.print(FONT16, 970 - Width, counterShift, Counter, COLOR_WHITE)
+			Graphics.fillRect(960 - Width, 960, counterShift, counterShift + Font.getTextHeight(FONT16, Counter) + 4, UI.color("SURFACE", 0.92))
+			Font.print(FONT16, 970 - Width, counterShift, Counter, UI.color("FONT"))
 		end
 	end
 	if MenuFade > 0 then
-		local BACK_COLOR = Color.new(0, 0, 0, 255 * MenuFade)
-		local GRAY_COLOR = Color.new(128, 128, 128, 255 * MenuFade)
-		local BLUE_COLOR = CloneColorWithNewAlpha(COLOR_ROYAL_BLUE, 255 * MenuFade)
+		local BACK_COLOR = UI.color("SURFACE", MenuFade)
+		local GRAY_COLOR = UI.color("SUBFONT", MenuFade)
+		local BLUE_COLOR = UI.color("SELECTOR", MenuFade)
 		Graphics.fillRect(88, 960 - 88 - 32 - 24 - 32, 0, 80 * MenuFade, BACK_COLOR)
 		Graphics.fillRect(0, 960, 544 - 80 * MenuFade, 544, BACK_COLOR)
 		if currentState == STATE_READING then
@@ -1640,8 +1610,8 @@ function Reader.draw()
 				Graphics.drawImage(200 + point - 6, 544 - 80 * MenuFade + 40 - 6, CircleIcon.e, BLUE_COLOR)
 				current_page = (allPages.Count - allPages.Page + 1)
 				current_page = math.max(1, math.min(current_page, allPages.Count))
-				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, allPages.Count), 544 - 80 * MenuFade + 23, allPages.Count, COLOR_WHITE)
-				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, current_page, COLOR_WHITE)
+				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, allPages.Count), 544 - 80 * MenuFade + 23, allPages.Count, UI.color("FONT", MenuFade))
+				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, current_page, UI.color("FONT", MenuFade))
 			elseif orientation == "Vertical" and is_down then
 				if allPages.Count == 1 then
 					point = 560
@@ -1651,46 +1621,46 @@ function Reader.draw()
 				Graphics.fillRect(200, 760, 544 - 80 * MenuFade + 39, 544 - 80 * MenuFade + 41, BLUE_COLOR)
 				Graphics.fillRect(200, 200 + point, 544 - 80 * MenuFade + 39, 544 - 80 * MenuFade + 41, GRAY_COLOR)
 				Graphics.drawImage(200 + point - 6, 544 - 80 * MenuFade + 40 - 6, CircleIcon.e, BLUE_COLOR)
-				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, allPages.Count), 544 - 80 * MenuFade + 23, allPages.Count, COLOR_WHITE)
-				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, current_page, COLOR_WHITE)
+				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, allPages.Count), 544 - 80 * MenuFade + 23, allPages.Count, UI.color("FONT", MenuFade))
+				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, current_page, UI.color("FONT", MenuFade))
 			else
 				Graphics.fillRect(200, 760, 544 - 80 * MenuFade + 39, 544 - 80 * MenuFade + 41, GRAY_COLOR)
 				Graphics.fillRect(200, 200 + point, 544 - 80 * MenuFade + 39, 544 - 80 * MenuFade + 41, BLUE_COLOR)
 				Graphics.drawImage(200 + point - 6, 544 - 80 * MenuFade + 40 - 6, CircleIcon.e, BLUE_COLOR)
-				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, current_page), 544 - 80 * MenuFade + 23, current_page, COLOR_WHITE)
-				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, allPages.Count, COLOR_WHITE)
+				Font.print(FONT26, 180 - Font.getTextWidth(FONT26, current_page), 544 - 80 * MenuFade + 23, current_page, UI.color("FONT", MenuFade))
+				Font.print(FONT26, 780, 544 - 80 * MenuFade + 23, allPages.Count, UI.color("FONT", MenuFade))
 			end
 		end
 		if currentChapterNumber > 1 and not (orientation == "Vertical" and is_down or readDirection == "LEFT") or currentChapterNumber < #Chapters and (orientation == "Vertical" and is_down or readDirection == "LEFT") then
-			Graphics.drawImage(32, 544 - 80 * MenuFade + 40 - 12, leftArrowIcon.e, COLOR_WHITE)
+			Graphics.drawImage(32, 544 - 80 * MenuFade + 40 - 12, leftArrowIcon.e, UI.color("FONT", MenuFade))
 		else
-			Graphics.drawImage(32, 544 - 80 * MenuFade + 40 - 12, leftArrowIcon.e, COLOR_GRAY)
+			Graphics.drawImage(32, 544 - 80 * MenuFade + 40 - 12, leftArrowIcon.e, UI.color("SUBFONT", MenuFade))
 		end
 		if currentChapterNumber < #Chapters and not (orientation == "Vertical" and is_down or readDirection == "LEFT") or currentChapterNumber > 1 and (orientation == "Vertical" and is_down or readDirection == "LEFT") then
-			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, COLOR_WHITE)
+			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, UI.color("FONT", MenuFade))
 		else
-			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, COLOR_GRAY)
+			Graphics.drawImage(960 - 32 - 24, 544 - 80 * MenuFade + 40 - 12, rightArrowIcon.e, UI.color("SUBFONT", MenuFade))
 		end
 		if Chapters[currentChapterNumber] then
-			local manga_name = Chapters[currentChapterNumber].Manga.Name
-			local chapter_name = Chapters[currentChapterNumber].Name
+			local manga_name = UI.capitalize(Chapters[currentChapterNumber].Manga.Name)
+			local chapter_name = UI.capitalize(Chapters[currentChapterNumber].Name)
 			local dif = math.max(Font.getTextWidth(BONT30, manga_name) - 960 + 88 + 32 + 24 + 32 + 24 + 32 + 32, 0)
 			local dif_ch = math.max(Font.getTextWidth(FONT16, chapter_name) - 960 + 88 + 32 + 24 + 32 + 24 + 32 + 32, 0)
 			local ms = 50 * string.len(manga_name)
 			local ms_ch = 50 * string.len(chapter_name)
 			local t = math.min(math.max(0, Timer.getTime(mangaNameTickerTimer) - 1500), ms)
 			local t_ch = math.min(math.max(0, Timer.getTime(chapterNameTickerTimer) - 1500), ms_ch)
-			Font.print(BONT30, 88 - dif * t / ms, 80 * MenuFade - 73, manga_name, COLOR_WHITE)
-			Font.print(FONT16, 88 - dif_ch * t_ch / ms_ch, 80 * MenuFade - 32, chapter_name, COLOR_WHITE)
+			Font.print(BONT30, 88 - dif * t / ms, 80 * MenuFade - 73, manga_name, UI.color("FONT", MenuFade))
+			Font.print(FONT16, 88 - dif_ch * t_ch / ms_ch, 80 * MenuFade - 32, chapter_name, UI.color("FONT", MenuFade))
 			Graphics.fillRect(0, 88, 0, 80 * MenuFade, BACK_COLOR)
-			Graphics.drawImage(32, 80 * MenuFade - 40 - 12, BackIcon.e, COLOR_WHITE)
+			Graphics.drawImage(32, 80 * MenuFade - 40 - 12, BackIcon.e, UI.color("FONT", MenuFade))
 			Graphics.fillRect(960 - 88 - 32 - 24 - 32, 960, 0, 80 * MenuFade, BACK_COLOR)
 			if currentState == STATE_READING then
-				Graphics.drawImage(960 - 32 - 24 - 32 - 32 - 24, 80 * MenuFade - 40 - 12, RefreshIcon.e, COLOR_WHITE)
+				Graphics.drawImage(960 - 32 - 24 - 32 - 32 - 24, 80 * MenuFade - 40 - 12, RefreshIcon.e, UI.color("FONT", MenuFade))
 				if allPages[allPages.Page] and (allPages[allPages.Page].Link or Chapters[currentChapterNumber].Manga.ParserID == "IMPORTED" or allPages[allPages.Page].Path) then
-					Graphics.drawImage(960 - 32 - 24, 80 * MenuFade - 40 - 12, OptionsIcon.e, COLOR_WHITE)
+					Graphics.drawImage(960 - 32 - 24, 80 * MenuFade - 40 - 12, OptionsIcon.e, UI.color("FONT", MenuFade))
 				else
-					Graphics.drawImage(960 - 32 - 24, 80 * MenuFade - 40 - 12, OptionsIcon.e, COLOR_GRAY)
+					Graphics.drawImage(960 - 32 - 24, 80 * MenuFade - 40 - 12, OptionsIcon.e, UI.color("SUBFONT", MenuFade))
 				end
 			end
 			if Timer.getTime(mangaNameTickerTimer) > 3500 + ms then
@@ -1708,9 +1678,9 @@ function Reader.draw()
 			local shift = 80 * (1 - MenuFade)
 			for i = ks, ks + 1 do
 				if CursorPoint.y > 272 then
-					Graphics.fillEmptyRect(CursorPoint.x - 20 - i, CursorPoint.x + 20 + i + 2, CursorPoint.y - 20 - i + shift, CursorPoint.y + 20 + i + 2 + shift, Color.new(255, 0, 51, 255 * CursorFade))
+					Graphics.fillEmptyRect(CursorPoint.x - 20 - i, CursorPoint.x + 20 + i + 2, CursorPoint.y - 20 - i + shift, CursorPoint.y + 20 + i + 2 + shift, UI.color("SELECTOR", CursorFade))
 				else
-					Graphics.fillEmptyRect(CursorPoint.x - 20 - i, CursorPoint.x + 20 + i + 2, CursorPoint.y - 20 - i - shift, CursorPoint.y + 20 + i + 2 - shift, Color.new(255, 0, 51, 255 * CursorFade))
+					Graphics.fillEmptyRect(CursorPoint.x - 20 - i, CursorPoint.x + 20 + i + 2, CursorPoint.y - 20 - i - shift, CursorPoint.y + 20 + i + 2 - shift, UI.color("SELECTOR", CursorFade))
 				end
 			end
 		end
@@ -1728,6 +1698,8 @@ function Reader.loadChapter(chapter)
 		ParserManager.remove(Chapters[currentChapterNumber].Pages)
 	end
 	currentChapterNumber = chapter
+	-- Release native textures and pending work before replacing their owner tables.
+	for i = 1, #allPages do deletePageImage(i) end
 	Chapters[chapter].Pages = {}
 	allPages = {
 		Page = 0
